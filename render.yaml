@@ -1,0 +1,126 @@
+services:
+  # ── Main API service ──────────────────────────────────────────────────────────
+  - type: web
+    name: babaji-api
+    runtime: python
+    plan: starter
+    region: oregon
+    rootDir: services/api
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        fromDatabase:
+          name: babaji-db
+          property: connectionString
+      - key: API_SECRET
+        generateValue: true
+      - key: ADMIN_API_TOKEN
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: APP_BASE_URL
+        sync: false
+      - key: ALLOW_INSECURE_DEMO_AUTH
+        value: "false"
+      - key: SEED_DEMO_ACCOUNTS
+        value: "true"
+      - key: EXPOSE_SEED_ACCOUNT_CATALOG
+        value: "true"
+      - key: SEED_ACCOUNT_PASSWORD
+        sync: false
+      - key: ADMIN_EMAILS
+        value: admin@babaji.app
+      - key: SUPPORT_EMAILS
+        value: support@babaji.app
+      - key: KB_SERVICE_URL
+        fromService:
+          name: babaji-kb
+          type: web
+          property: host
+      # Optional — set for full AI narratives
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Optional — Stripe
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_PLUS
+        sync: false
+      - key: STRIPE_PRICE_PRO
+        sync: false
+      - key: STRIPE_PRICE_ELITE
+        sync: false
+      # Optional — Email
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        value: noreply@babaji.app
+      # Optional — Sentry
+      - key: SENTRY_DSN
+        sync: false
+
+  # ── Knowledge Base service ────────────────────────────────────────────────────
+  - type: web
+    name: babaji-kb
+    runtime: python
+    plan: starter
+    region: oregon
+    rootDir: services/kb
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: ADMIN_API_TOKEN
+        fromService:
+          name: babaji-api
+          type: web
+          envVarKey: ADMIN_API_TOKEN
+      - key: DATABASE_URL
+        fromDatabase:
+          name: babaji-db
+          property: connectionString
+
+  # ── Next.js Web App ───────────────────────────────────────────────────────────
+  - type: web
+    name: babaji-web
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: corepack enable && corepack pnpm install --frozen-lockfile && corepack pnpm --filter web build
+    startCommand: cd apps/web && corepack pnpm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: NEXT_PUBLIC_API_BASE
+        fromService:
+          name: babaji-api
+          type: web
+          property: host
+      # Optional
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        sync: false
+      - key: NEXT_PUBLIC_GOOGLE_ANALYTICS_ID
+        sync: false
+
+databases:
+  - name: babaji-db
+    plan: basic-256mb
+    region: oregon
+    databaseName: babaji
+    user: babaji
+    ipAllowList: []   # defaults to all — restrict to service IPs in production

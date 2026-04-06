@@ -1,0 +1,62 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - web
+      - api
+    volumes:
+      - ./nginx/aws-lite.conf:/etc/nginx/conf.d/default.conf:ro
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: /api
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_BASE: /api
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: ../services/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      KB_SERVICE_URL: http://kb:8102
+      KG_SERVICE_URL: http://kg:8103
+      MEDIA_SERVICE_URL: http://media:8104
+      LIVEKIT_URL: ws://rtc-disabled-in-lite:7880
+    depends_on:
+      - kb
+      - kg
+      - media
+
+  kb:
+    build:
+      context: ../services/kb
+      dockerfile: Dockerfile
+    restart: unless-stopped
+
+  kg:
+    build:
+      context: ../services/kg
+      dockerfile: Dockerfile
+    restart: unless-stopped
+
+  media:
+    build:
+      context: ../services/media
+      dockerfile: Dockerfile
+    restart: unless-stopped
+
+  agents:
+    build:
+      context: ../services/agents
+      dockerfile: Dockerfile
+    restart: unless-stopped

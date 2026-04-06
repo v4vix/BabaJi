@@ -1,0 +1,14 @@
+flowchart LR
+    UserWeb["Web App (Next.js)"] --> API["FastAPI API Gateway"]
+    UserMobile["Mobile App (Expo)"] --> API
+    API --> KB["KB Service"]
+    API --> KG["KG Service"]
+    API --> AG["Agents Service"]
+    API --> MEDIA["Media Service"]
+    API --> RTC["LiveKit RTC"]
+    KB --> PG[(Postgres + pgvector target)]
+    KG --> NEO[(Neo4j)]
+    API --> LLM["Ollama / llama.cpp"]
+    API --> ASR["whisper.cpp"]
+    API --> TTS["Piper"]
+    MEDIA --> FFMPEG["ffmpeg renderer"]

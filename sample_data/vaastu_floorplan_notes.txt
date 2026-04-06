@@ -1,0 +1,5 @@
+Facing: East
+Entrance: Northeast
+Kitchen: Southeast
+Master Bedroom: Southwest
+Constraints: No structural demolition. Prefer low-cost adjustments.

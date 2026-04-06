@@ -1,0 +1,40 @@
+# Caddy reverse-proxy with automatic TLS (Let's Encrypt / ZeroSSL).
+# Set APP_DOMAIN in your .env (e.g. babaji.app) and reference it here,
+# or replace {$APP_DOMAIN} with your actual domain.
+
+{$APP_DOMAIN} {
+    # API — all /v1/* and /healthz requests go to FastAPI
+    handle /v1/* {
+        reverse_proxy api:8101
+    }
+    handle /healthz {
+        reverse_proxy api:8101
+    }
+
+    # Stripe webhook needs the raw body intact
+    handle /v1/billing/stripe/webhook {
+        reverse_proxy api:8101
+    }
+
+    # Everything else → Next.js web app
+    handle {
+        reverse_proxy web:3000
+    }
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    encode gzip
+    log {
+        output stdout
+        format json
+    }
+}
+
+# Redirect bare HTTP → HTTPS handled automatically by Caddy

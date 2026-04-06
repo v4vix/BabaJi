@@ -1,0 +1,1 @@
+This sample text is non-copyright fixture content used for local ingestion tests and citation demos.

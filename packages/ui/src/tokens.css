@@ -1,0 +1,12 @@
+:root {
+  --font-display: "Fraunces", serif;
+  --font-body: "Source Sans 3", sans-serif;
+  --color-bg: #f7f3ea;
+  --color-surface: #fffdf9;
+  --color-primary: #005f73;
+  --color-secondary: #bb3e03;
+  --color-accent: #ca6702;
+  --color-text: #1f2933;
+  --radius-lg: 18px;
+  --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.08);
+}

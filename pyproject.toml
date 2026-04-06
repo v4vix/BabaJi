@@ -1,0 +1,28 @@
+[project]
+name = "cerebral-cortex-services"
+version = "0.1.0"
+description = "Local-first backend services for cerebral cortex digital twin"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi==0.115.6",
+  "uvicorn[standard]==0.32.1",
+  "pydantic==2.10.3",
+  "pydantic-settings==2.6.1",
+  "httpx==0.28.0",
+  "python-jose[cryptography]==3.3.0",
+  "orjson==3.10.12",
+  "pyswisseph==2.10.3.2",
+  "anthropic>=0.40.0",
+  "python-multipart==0.0.20",
+  "bcrypt>=4.2.0",
+  "stripe>=11.0.0",
+  "sentry-sdk[fastapi]>=2.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+  "ui: Selenium-driven UI functional tests (opt-in)",
+]

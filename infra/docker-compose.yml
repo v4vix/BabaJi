@@ -1,0 +1,115 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: cortex
+      POSTGRES_PASSWORD: cortex
+      POSTGRES_DB: cortex
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  neo4j:
+    image: neo4j:5.26
+    environment:
+      NEO4J_AUTH: neo4j/testpassword
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+
+  ollama:
+    image: ollama/ollama:0.5.4
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  whisper_cpp:
+    image: ghcr.io/ggerganov/whisper.cpp:main
+    platform: linux/amd64
+    command: ["--help"]
+    profiles: ["optional"]
+
+  piper_tts:
+    image: rhasspy/wyoming-piper:latest
+    command: ["--voice", "en_US-lessac-medium"]
+    ports:
+      - "10200:10200"
+    profiles: ["optional"]
+
+  livekit:
+    image: livekit/livekit-server:v1.7.2
+    command: ["--config", "/etc/livekit.yaml"]
+    volumes:
+      - ../services/rtc/livekit.yaml:/etc/livekit.yaml
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+
+  api:
+    image: python:3.11-slim
+    working_dir: /workspace
+    volumes:
+      - ../services/api:/workspace
+    command: >
+      bash -lc "pip install -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8101"
+    ports:
+      - "8101:8101"
+    depends_on:
+      - kb
+      - kg
+      - media
+
+  kb:
+    image: python:3.11-slim
+    working_dir: /workspace
+    volumes:
+      - ../services/kb:/workspace
+    command: >
+      bash -lc "pip install -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8102"
+    ports:
+      - "8102:8102"
+
+  kg:
+    image: python:3.11-slim
+    working_dir: /workspace
+    volumes:
+      - ../services/kg:/workspace
+    command: >
+      bash -lc "pip install -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8103"
+    ports:
+      - "8103:8103"
+
+  media:
+    image: python:3.11-slim
+    working_dir: /workspace
+    volumes:
+      - ../services/media:/workspace
+    command: >
+      bash -lc "pip install -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8104"
+    ports:
+      - "8104:8104"
+
+  agents:
+    image: python:3.11-slim
+    working_dir: /workspace
+    volumes:
+      - ../services/agents:/workspace
+    command: >
+      bash -lc "pip install -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8105"
+    ports:
+      - "8105:8105"
+
+volumes:
+  pg_data:
+  neo4j_data:
+  ollama_data:

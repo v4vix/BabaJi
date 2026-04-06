@@ -1,0 +1,16 @@
+[
+  {
+    "profile_id": "sample-a",
+    "date": "1992-05-19",
+    "time": "06:30",
+    "timezone": "Asia/Kolkata",
+    "location": "Pune"
+  },
+  {
+    "profile_id": "sample-b",
+    "date": "1988-11-02",
+    "time": "21:15",
+    "timezone": "Asia/Kolkata",
+    "location": "Lucknow"
+  }
+]
