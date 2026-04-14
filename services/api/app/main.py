@@ -348,7 +348,7 @@ _redis: Any = None  # set by _init_rate_limiter if REDIS_URL is configured
 
 async def _init_rate_limiter() -> None:
     global _redis
-    redis_url = os.environ.get("REDIS_URL", "")
+    redis_url = _os.environ.get("REDIS_URL", "")
     if redis_url:
         try:
             import redis.asyncio as _aioredis  # type: ignore[import]

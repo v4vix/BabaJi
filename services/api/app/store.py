@@ -1696,7 +1696,7 @@ def admin_platform_stats() -> dict[str, Any]:
                 SELECT COALESCE(s.plan, 'free') AS plan, COUNT(*) AS n
                 FROM users u
                 LEFT JOIN user_subscriptions s ON s.user_id = u.id
-                GROUP BY plan
+                GROUP BY COALESCE(s.plan, 'free')
                 ORDER BY n DESC
                 """
             ).fetchall()
