@@ -122,7 +122,7 @@ def _ensure_column(conn: _Conn, table_name: str, column_name: str, ddl_type: str
     conn.ensure_column(table_name, column_name, ddl_type)
 
 
-_CURRENT_SCHEMA_VERSION = 5
+_CURRENT_SCHEMA_VERSION = 6
 
 
 def _record_migration(conn: "_Conn", version: int) -> None:
@@ -357,6 +357,11 @@ def init_db() -> None:
             # Migration 5: operator suspension flag on users
             conn.ensure_column("users", "suspended", "INTEGER NOT NULL DEFAULT 0")
             _record_migration(conn, 5)
+
+            # Migration 6: rich user profile fields
+            conn.ensure_column("users", "full_name", "TEXT DEFAULT ''")
+            conn.ensure_column("users", "birth_profile_json", "TEXT DEFAULT '{}'")
+            _record_migration(conn, 6)
 
             conn.ensure_column("billing_events", "app_user_id", "TEXT")
             conn.ensure_column("billing_events", "plan", "TEXT")
@@ -1290,6 +1295,8 @@ def upsert_user_account(
     email: str,
     password: str,
     display_name: str = "",
+    full_name: str = "",
+    birth_profile: dict[str, Any] | None = None,
     role: str = "user",
     plan: str = "free",
     subscription_status: str = "active",
@@ -1309,6 +1316,7 @@ def upsert_user_account(
     existing = get_user_by_email(email)
     hashed = _hash_password(password)
     now = datetime.now(timezone.utc).isoformat()
+    birth_json = json.dumps(birth_profile or {})
 
     with _LOCK:
         conn = _connect()
@@ -1318,12 +1326,15 @@ def upsert_user_account(
                 conn.execute(
                     """
                     UPDATE users
-                    SET password_hash = ?, display_name = ?, role = ?, plan = ?, email_verified = ?, suspended = ?
+                    SET password_hash = ?, display_name = ?, full_name = ?, birth_profile_json = ?,
+                        role = ?, plan = ?, email_verified = ?, suspended = ?
                     WHERE id = ?
                     """,
                     (
                         hashed,
                         display_name,
+                        full_name,
+                        birth_json,
                         role,
                         plan,
                         1 if email_verified else 0,
@@ -1338,15 +1349,18 @@ def upsert_user_account(
                 conn.execute(
                     """
                     INSERT INTO users(
-                        id, email, password_hash, display_name, plan, created_at, role, email_verified, suspended
+                        id, email, password_hash, display_name, full_name, birth_profile_json,
+                        plan, created_at, role, email_verified, suspended
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         user_id,
                         email,
                         hashed,
                         display_name,
+                        full_name,
+                        birth_json,
                         plan,
                         now,
                         role,

@@ -553,3 +553,62 @@ class SubscriptionEventResponse(BaseModel):
 
 class SubscriptionEventListResponse(BaseModel):
     events: list[SubscriptionEventResponse]
+
+
+# ─── New market-researched features ──────────────────────────────────────────
+
+class SadeSatiRequest(BaseModel):
+    birth: BirthInput
+    query_time_iso: Optional[str] = None
+
+
+class SadeSatiResponse(BaseModel):
+    natal_moon_sign: str
+    current_saturn_sign: str
+    sade_sati_active: bool
+    phase: Optional[int] = None
+    phase_description: Optional[str] = None
+    days_remaining_in_phase: Optional[int] = None
+    years_remaining_in_phase: Optional[float] = None
+    days_to_next_sade_sati: Optional[int] = None
+    years_to_next_sade_sati: Optional[float] = None
+    summary: str
+    remedies: list[str]
+
+
+class AshtakavargaRequest(BaseModel):
+    birth: BirthInput
+
+
+class AshtakavargaResponse(BaseModel):
+    sarva_ashtakavarga: list[dict[str, Any]]
+    total_benefic_points: int
+    best_transit_signs: list[str]
+    weakest_signs: list[str]
+    lagna_ashtakavarga_score: int
+    summary: str
+
+
+class PrashnaRequest(BaseModel):
+    question: str = Field(..., min_length=5, max_length=500)
+    latitude: float = 28.6139
+    longitude: float = 77.2090
+    timezone: str = "Asia/Kolkata"
+    query_time_iso: Optional[str] = None
+
+
+class PrashnaResponse(BaseModel):
+    question: str
+    prashna_lagna: str
+    prashna_lagna_lord: str
+    moon_sign: str
+    moon_nakshatra: str
+    moon_waxing: bool
+    primary_house: int
+    primary_house_signification: str
+    primary_house_lord: str
+    lord_well_placed: bool
+    verdict: str
+    summary: str
+    interpretation_context: str
+    disclaimers: list[str]

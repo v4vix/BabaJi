@@ -101,6 +101,12 @@ from .schemas import (
     WalletLedgerEntry,
     WalletResponse,
     WalletTopupRequest,
+    SadeSatiRequest,
+    SadeSatiResponse,
+    AshtakavargaRequest,
+    AshtakavargaResponse,
+    PrashnaRequest,
+    PrashnaResponse,
 )
 from .jyotish import (
     DASHA_LORD_MEANINGS,
@@ -109,7 +115,10 @@ from .jyotish import (
     NAKSHATRA_NAMES,
     SIGN_NATURE,
     SIGNS,
+    compute_ashtakavarga,
     compute_kundli_facts,
+    compute_prashna_kundli,
+    compute_sade_sati,
     panchang_for_date,
     pick_muhurta_windows,
     score_matchmaking,
@@ -184,6 +193,8 @@ class UserResponse(_BaseModel):
     id: str
     email: str
     display_name: str
+    full_name: str = ""
+    birth_profile: dict = {}
     plan: str
     role: str = "user"
     created_at: str
@@ -524,55 +535,91 @@ def _normalize_role(value: Any) -> str:
     return role if role in _ALLOWED_ROLES else "user"
 
 
-def _seed_account_templates() -> list[dict[str, str]]:
+def _seed_account_templates() -> list[dict]:
     password = settings.seed_account_password or "BabaJiDemo123!"
     return [
         {
             "email": "free@babaji.app",
             "password": password,
-            "display_name": "Free Explorer",
+            "display_name": "Ananya S",
+            "full_name": "Ananya Sharma",
             "plan": "free",
             "role": "user",
-            "note": "Starter member with the free plan.",
+            "birth_profile": {
+                "date": "1998-07-24", "time": "09:15", "timezone": "Asia/Kolkata",
+                "location": "Mumbai, India", "latitude": 19.076, "longitude": 72.8777,
+                "gender": "female",
+            },
+            "note": "Young professional exploring Vedic astrology for the first time.",
         },
         {
             "email": "plus@babaji.app",
             "password": password,
-            "display_name": "Plus Member",
+            "display_name": "Rajesh N",
+            "full_name": "Rajesh Nair",
             "plan": "plus",
             "role": "user",
-            "note": "Unlocked Plus flows for repeat personal use.",
+            "birth_profile": {
+                "date": "1990-03-12", "time": "06:30", "timezone": "Asia/Kolkata",
+                "location": "Bengaluru, India", "latitude": 12.9716, "longitude": 77.5946,
+                "gender": "male",
+            },
+            "note": "Business professional using Plus for personal kundli and muhurta.",
         },
         {
             "email": "pro@babaji.app",
             "password": password,
-            "display_name": "Pro Member",
+            "display_name": "Priya M",
+            "full_name": "Priya Mehta",
             "plan": "pro",
             "role": "user",
-            "note": "Unlocked Pro workflows including richer studio paths.",
+            "birth_profile": {
+                "date": "1985-11-05", "time": "14:22", "timezone": "Asia/Kolkata",
+                "location": "New Delhi, India", "latitude": 28.6139, "longitude": 77.2090,
+                "gender": "female",
+            },
+            "note": "HR consultant using Pro for team compatibility and matchmaking studio.",
         },
         {
             "email": "elite@babaji.app",
             "password": password,
-            "display_name": "Elite Member",
+            "display_name": "Dr. Suresh K",
+            "full_name": "Dr. Suresh Krishnamurthy",
             "plan": "elite",
             "role": "user",
-            "note": "Unlocked the full Elite member experience.",
+            "birth_profile": {
+                "date": "1978-01-30", "time": "04:45", "timezone": "Asia/Kolkata",
+                "location": "Chennai, India", "latitude": 13.0827, "longitude": 80.2707,
+                "gender": "male",
+            },
+            "note": "Senior executive with full Elite access — vaastu, gem consultancy, video kundli.",
         },
         {
             "email": "support@babaji.app",
             "password": password,
-            "display_name": "Support Guide",
+            "display_name": "Meera P",
+            "full_name": "Meera Pillai",
             "plan": "pro",
             "role": "support",
-            "note": "Support-level operator access for moderation and care workflows.",
+            "birth_profile": {
+                "date": "1992-06-18", "time": "11:00", "timezone": "Asia/Kolkata",
+                "location": "Hyderabad, India", "latitude": 17.3850, "longitude": 78.4867,
+                "gender": "female",
+            },
+            "note": "Support-level operator for moderation and care workflows.",
         },
         {
             "email": "admin@babaji.app",
             "password": password,
-            "display_name": "Open Admin",
+            "display_name": "BabaJi Admin",
+            "full_name": "BabaJi Platform Admin",
             "plan": "elite",
             "role": "admin",
+            "birth_profile": {
+                "date": "1975-04-14", "time": "12:00", "timezone": "Asia/Kolkata",
+                "location": "Varanasi, India", "latitude": 25.3176, "longitude": 82.9739,
+                "gender": "male",
+            },
             "note": "Full admin access with every plan entitlement enabled.",
         },
     ]
@@ -591,12 +638,14 @@ def _ensure_seeded_accounts() -> list[dict[str, str]]:
 
     init_db()
 
-    seeded: list[dict[str, str]] = []
+    seeded: list[dict] = []
     for account in _seed_account_templates():
-        upsert_user_account(
+        user = upsert_user_account(
             email=account["email"],
             password=account["password"],
             display_name=account["display_name"],
+            full_name=account.get("full_name", ""),
+            birth_profile=account.get("birth_profile"),
             role=account["role"],
             plan=account["plan"],
             subscription_status="active",
@@ -605,6 +654,27 @@ def _ensure_seeded_accounts() -> list[dict[str, str]]:
             source="seed_demo_accounts",
             external_ref=account["role"],
         )
+        # Pre-seed a sample kundli report for paid-tier demo accounts
+        if account["plan"] in ("plus", "pro", "elite") and user:
+            user_id = str(user.get("id", ""))
+            bp = account.get("birth_profile", {})
+            if user_id and bp:
+                from .store import save_report as _save_report, list_reports as _list_reports
+                if not _list_reports(user_id, limit=1):
+                    _save_report(
+                        user_id=user_id,
+                        report_type="kundli",
+                        title=f"Birth Chart — {account['full_name']}",
+                        content={
+                            "birth": bp,
+                            "summary": (
+                                f"Vedic birth chart for {account['full_name']} born on "
+                                f"{bp.get('date')} at {bp.get('time')} in {bp.get('location')}. "
+                                "This is a pre-seeded demo report. Generate a live report to get "
+                                "full AI-powered analysis."
+                            ),
+                        },
+                    )
         seeded.append(account)
 
     _SEEDED_ACCOUNTS_CACHE = seeded
@@ -622,9 +692,16 @@ def _resolved_user_role(user_record: dict[str, Any] | None) -> str:
 
 
 def _user_response(user_record: dict[str, Any]) -> UserResponse:
+    import json as _json
     payload = dict(user_record)
     payload["role"] = _resolved_user_role(user_record)
-    return UserResponse(**payload)
+    payload.setdefault("full_name", "")
+    raw_birth = payload.pop("birth_profile_json", None) or "{}"
+    try:
+        payload["birth_profile"] = _json.loads(raw_birth) if isinstance(raw_birth, str) else (raw_birth or {})
+    except Exception:
+        payload["birth_profile"] = {}
+    return UserResponse(**{k: v for k, v in payload.items() if k in UserResponse.model_fields})
 
 
 def _ctx_is_staff(ctx: dict[str, Any], allowed_roles: set[str] | None = None) -> bool:
@@ -1019,7 +1096,7 @@ async def kundli_report(
     citation_text = ""
     if citations:
         citation_text = "\n\nRelevant Jyotish corpus citations:\n" + "\n".join(
-            f"- [{c.source}]: {c.text}" for c in citations
+            f"- [{c.source_id}] {c.title} ({c.locator})" for c in citations
         )
     system_prompt = (
         "You are BabaJi — a Vedic astrologer generating a comprehensive birth chart reading. "
@@ -1178,7 +1255,7 @@ async def _claude_kundli_answer(
     citation_text = ""
     if citations:
         citation_text = "\n\nRelevant Jyotish corpus citations:\n" + "\n".join(
-            f"- [{c.source}]: {c.text}" for c in citations
+            f"- [{c.source_id}] {c.title} ({c.locator})" for c in citations
         )
     system_prompt = (
         "You are BabaJi — a knowledgeable, compassionate Vedic astrologer (Jyotishi) with deep grounding in "
@@ -3601,3 +3678,62 @@ async def admin_audit_feed(
     require_staff_role(ctx, {"admin"})
     events = admin_global_audit(provider=provider, user_id=user_id, limit=limit, offset=offset)
     return {"events": events, "limit": limit, "offset": offset}
+
+
+# ─── Sade Sati ───────────────────────────────────────────────────────────────
+
+@app.post("/v1/transits/sade-sati", response_model=SadeSatiResponse, tags=["transits"])
+async def sade_sati_check(
+    request: SadeSatiRequest,
+    ctx: dict[str, Any] = Depends(entitlement_context),
+) -> SadeSatiResponse:
+    """Compute Sade Sati (Saturn 7.5-year transit) status for a natal chart."""
+    require_entitlement(ctx, "kundli.report")
+    birth = request.birth.model_dump()
+    facts = compute_kundli_facts(birth)
+    result = compute_sade_sati(facts, query_ts=None)
+    return SadeSatiResponse(**result)
+
+
+# ─── Ashtakavarga ────────────────────────────────────────────────────────────
+
+@app.post("/v1/kundli/ashtakavarga", response_model=AshtakavargaResponse, tags=["kundli"])
+async def kundli_ashtakavarga(
+    request: AshtakavargaRequest,
+    ctx: dict[str, Any] = Depends(entitlement_context),
+) -> AshtakavargaResponse:
+    """Compute Sarva Ashtakavarga — the 8-contributor benefic point tally per sign."""
+    require_entitlement(ctx, "kundli.report")
+    birth = request.birth.model_dump()
+    facts = compute_kundli_facts(birth)
+    result = compute_ashtakavarga(facts)
+    return AshtakavargaResponse(**result)
+
+
+# ─── Prashna Kundli ──────────────────────────────────────────────────────────
+
+@app.post("/v1/prashna", response_model=PrashnaResponse, tags=["prashna"])
+async def prashna_kundli(
+    request: PrashnaRequest,
+    ctx: dict[str, Any] = Depends(entitlement_context),
+) -> PrashnaResponse:
+    """
+    Compute a Prashna (Horary) Kundli for the moment a question is asked.
+    Requires Plus plan or above.
+    """
+    require_entitlement(ctx, "kundli.report")
+    result = compute_prashna_kundli(
+        question=request.question,
+        query_time_iso=request.query_time_iso,
+        latitude=request.latitude,
+        longitude=request.longitude,
+        timezone_name=request.timezone,
+    )
+    return PrashnaResponse(
+        **{k: v for k, v in result.items() if k != "prashna_chart"},
+        disclaimers=[
+            "Prashna Kundli is a traditional horary system for guidance only.",
+            "This reading does not constitute medical, legal, or financial advice.",
+            "For important decisions, consult a qualified Jyotishi.",
+        ],
+    )

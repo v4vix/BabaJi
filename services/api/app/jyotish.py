@@ -755,3 +755,397 @@ def score_matchmaking(seeker_facts: dict[str, Any], partner_facts: dict[str, Any
         "watchouts": watchouts if watchouts else ["No major doshas detected in the 8-koota analysis."],
         "compatibility_paths": paths,
     }
+
+
+# ─── Sade Sati Calculator ────────────────────────────────────────────────────
+
+_SATURN_SIDEREAL_PERIOD_YEARS = 29.4571
+_SATURN_REF_LONG_DEG = 330.0   # Saturn ~Aquarius 0° at J2000.0 (approx)
+_J2000_UNIX = 946728000         # 2000-01-01 12:00 UTC unix timestamp
+
+SADE_SATI_PHASES = {
+    0: "Rising (12th from Moon) — outer preparations, latent pressure building",
+    1: "Peak (Moon sign) — most intense; challenges to mind, health, and wealth",
+    2: "Setting (2nd from Moon) — winding down; residual lessons in speech and finances",
+}
+
+SADE_SATI_REMEDIES = [
+    "Chant Shani Stotram every Saturday morning",
+    "Donate black sesame (til), mustard oil, or blue cloth on Saturdays",
+    "Light a sesame oil lamp at a Shani temple on Saturdays",
+    "Recite 'ॐ शं शनैश्चराय नमः' 108 times daily",
+    "Wear a Blue Sapphire (Neelam) after consulting a qualified Jyotishi",
+    "Feed crows or dark-coloured birds on Saturdays",
+    "Practice Hanuman Chalisa recitation — Hanuman is traditionally protective during Shani periods",
+    "Observe discipline: punctuality, service to elders, and ethical conduct reduce Shani's karmic load",
+]
+
+
+def _saturn_sidereal_longitude(unix_ts: float) -> float:
+    """Return Saturn's approximate sidereal longitude (0–360°)."""
+    if swe is not None:
+        try:
+            jd = swe.julday(
+                datetime.utcfromtimestamp(unix_ts).year,
+                datetime.utcfromtimestamp(unix_ts).month,
+                datetime.utcfromtimestamp(unix_ts).day,
+                datetime.utcfromtimestamp(unix_ts).hour
+                + datetime.utcfromtimestamp(unix_ts).minute / 60.0,
+            )
+            swe.set_sid_mode(swe.SIDM_LAHIRI)
+            result, _ = swe.calc_ut(jd, swe.SATURN, swe.FLG_SIDEREAL)
+            return float(result[0]) % 360
+        except Exception:
+            pass
+    # Fallback: simple linear approximation from reference
+    years_since_j2000 = (unix_ts - _J2000_UNIX) / (365.25 * 86400)
+    degrees_per_year = 360.0 / _SATURN_SIDEREAL_PERIOD_YEARS
+    return (_SATURN_REF_LONG_DEG + years_since_j2000 * degrees_per_year) % 360
+
+
+def compute_sade_sati(birth_data: dict[str, Any], query_ts: float | None = None) -> dict[str, Any]:
+    """
+    Compute Sade Sati status for a natal chart.
+
+    birth_data must contain natal Moon longitude (degrees, sidereal) or
+    a 'moon_sign_index' (0=Aries … 11=Pisces).
+    Returns current phase, duration remaining, and remedies.
+    """
+    import time as _time
+
+    now_ts = query_ts or _time.time()
+    facts = compute_kundli_facts(birth_data) if "moon_sign_index" not in birth_data else birth_data
+    planets = facts.get("planets", {})
+    moon_info = planets.get("Moon", {})
+
+    # Moon sign index (0=Aries…11=Pisces)
+    moon_sign_name = moon_info.get("sign", facts.get("moon_sign", "Unknown"))
+    if moon_sign_name in SIGNS:
+        moon_sign_idx = SIGNS.index(moon_sign_name)
+    else:
+        moon_sign_idx = birth_data.get("moon_sign_index", 0)
+
+    saturn_long = _saturn_sidereal_longitude(now_ts)
+    saturn_sign_idx = int(saturn_long // 30) % 12
+
+    # Sade Sati: Saturn in 12th, Moon, or 2nd from natal Moon
+    sade_sati_signs = [
+        (moon_sign_idx - 1) % 12,
+        moon_sign_idx,
+        (moon_sign_idx + 1) % 12,
+    ]
+    is_active = saturn_sign_idx in sade_sati_signs
+    phase_idx = sade_sati_signs.index(saturn_sign_idx) if is_active else None
+
+    # Saturn stays ~2.5 years per sign; compute degrees remaining in current sign
+    saturn_deg_in_sign = saturn_long % 30
+    degrees_remaining = 30 - saturn_deg_in_sign
+    # Saturn moves ~0.0339 degrees/day
+    days_remaining_in_sign = degrees_remaining / 0.0339
+
+    # Find next Sade Sati start: next time Saturn enters (Moon-1) sign
+    next_phase0_sign = (moon_sign_idx - 1) % 12
+    signs_to_next = (next_phase0_sign - saturn_sign_idx) % 12
+    days_to_next_sade_sati = (signs_to_next * 30 + degrees_remaining) / 0.0339
+
+    result: dict[str, Any] = {
+        "natal_moon_sign": moon_sign_name,
+        "natal_moon_sign_index": moon_sign_idx,
+        "current_saturn_sign": SIGNS[saturn_sign_idx],
+        "current_saturn_long_deg": round(saturn_long, 2),
+        "sade_sati_active": is_active,
+    }
+
+    if is_active:
+        result["phase"] = phase_idx
+        result["phase_description"] = SADE_SATI_PHASES[phase_idx]
+        result["days_remaining_in_phase"] = round(days_remaining_in_sign)
+        result["years_remaining_in_phase"] = round(days_remaining_in_sign / 365.25, 2)
+        result["summary"] = (
+            f"Sade Sati is ACTIVE — Saturn is transiting {SIGNS[saturn_sign_idx]}, "
+            f"which is the {['12th from', 'natal', '2nd from'][phase_idx]} your Moon sign "
+            f"({moon_sign_name}). Phase ends in approximately "
+            f"{round(days_remaining_in_sign / 365.25, 1)} years."
+        )
+    else:
+        result["days_to_next_sade_sati"] = round(days_to_next_sade_sati)
+        result["years_to_next_sade_sati"] = round(days_to_next_sade_sati / 365.25, 2)
+        result["summary"] = (
+            f"Sade Sati is NOT active. Saturn is in {SIGNS[saturn_sign_idx]}. "
+            f"Next Sade Sati begins in approximately "
+            f"{round(days_to_next_sade_sati / 365.25, 1)} years."
+        )
+
+    result["remedies"] = SADE_SATI_REMEDIES
+    return result
+
+
+# ─── Ashtakavarga Scoring ────────────────────────────────────────────────────
+
+# Benefic sign positions (1-based offset from the planet's own position)
+# Source: BPHS (Brihat Parashara Hora Shastra) standard tables
+_ASHTAK_BENEFIC_OFFSETS: dict[str, list[int]] = {
+    "Sun":     [1, 2, 4, 7, 8, 9, 10, 11],
+    "Moon":    [3, 6, 7, 8, 10, 11],
+    "Mars":    [1, 2, 4, 7, 8, 10, 11],
+    "Mercury": [1, 3, 5, 6, 9, 10, 11, 12],
+    "Jupiter": [1, 2, 3, 4, 7, 8, 10, 11],
+    "Venus":   [1, 2, 3, 4, 5, 8, 9, 11, 12],
+    "Saturn":  [3, 5, 6, 11],
+    "Lagna":   [1, 3, 4, 6, 10, 11],
+}
+
+# Moon additionally contributes from Sun's position
+_MOON_FROM_SUN_OFFSETS = [3, 6, 10, 11]
+
+
+def compute_ashtakavarga(facts: dict[str, Any]) -> dict[str, Any]:
+    """
+    Compute Sarva Ashtakavarga (combined benefic point tally per sign).
+
+    facts: output of compute_kundli_facts(). Uses planet sign positions.
+    Returns per-sign scores (0–56), total, and interpretation.
+    """
+    planets = facts.get("planets", {})
+    lagna_sign = facts.get("lagna_sign", "Aries")
+    lagna_idx = SIGNS.index(lagna_sign) if lagna_sign in SIGNS else 0
+
+    def sign_idx(planet_name: str) -> int:
+        p = planets.get(planet_name, {})
+        s = p.get("sign", "Aries")
+        return SIGNS.index(s) if s in SIGNS else 0
+
+    # Build planet sign indices
+    planet_positions = {
+        "Sun": sign_idx("Sun"),
+        "Moon": sign_idx("Moon"),
+        "Mars": sign_idx("Mars"),
+        "Mercury": sign_idx("Mercury"),
+        "Jupiter": sign_idx("Jupiter"),
+        "Venus": sign_idx("Venus"),
+        "Saturn": sign_idx("Saturn"),
+        "Lagna": lagna_idx,
+    }
+
+    # Tally benefic points per sign for each contributor
+    sign_scores = [0] * 12
+    contributor_tables: dict[str, list[int]] = {}
+
+    for contributor, offsets in _ASHTAK_BENEFIC_OFFSETS.items():
+        base_idx = planet_positions.get(contributor, 0)
+        row = [0] * 12
+        for off in offsets:
+            target = (base_idx + off - 1) % 12
+            row[target] += 1
+            sign_scores[target] += 1
+        contributor_tables[contributor] = row
+
+    # Moon's additional contribution from Sun
+    sun_idx = planet_positions["Sun"]
+    for off in _MOON_FROM_SUN_OFFSETS:
+        target = (sun_idx + off - 1) % 12
+        sign_scores[target] += 1
+
+    total = sum(sign_scores)
+
+    # Per-sign interpretation
+    def _strength_label(score: int) -> str:
+        if score >= 30:
+            return "Excellent (highly auspicious)"
+        if score >= 25:
+            return "Good (favourable)"
+        if score >= 20:
+            return "Moderate (average results)"
+        if score >= 15:
+            return "Weak (challenges likely)"
+        return "Very weak (difficult period)"
+
+    per_sign = [
+        {
+            "sign": SIGNS[i],
+            "sign_index": i,
+            "score": sign_scores[i],
+            "strength_label": _strength_label(sign_scores[i]),
+        }
+        for i in range(12)
+    ]
+
+    # Top 3 strongest signs for transit planning
+    sorted_signs = sorted(per_sign, key=lambda x: x["score"], reverse=True)
+    best_transit_signs = [s["sign"] for s in sorted_signs[:3]]
+    weakest_signs = [s["sign"] for s in sorted_signs[-3:]]
+
+    # Lagna sign score context
+    lagna_score = sign_scores[lagna_idx]
+
+    return {
+        "sarva_ashtakavarga": per_sign,
+        "total_benefic_points": total,
+        "best_transit_signs": best_transit_signs,
+        "weakest_signs": weakest_signs,
+        "lagna_ashtakavarga_score": lagna_score,
+        "contributor_tables": contributor_tables,
+        "summary": (
+            f"Total Sarva Ashtakavarga: {total}/337. "
+            f"Strongest signs for positive results: {', '.join(best_transit_signs)}. "
+            f"Weakest signs requiring caution: {', '.join(weakest_signs)}. "
+            f"Your Lagna ({lagna_sign}) scores {lagna_score}/56 — "
+            f"{_strength_label(lagna_score).lower()}."
+        ),
+    }
+
+
+# ─── Prashna Kundli (Horary Astrology) ──────────────────────────────────────
+
+_PRASHNA_HOUSE_SIGNIFICATIONS = {
+    1: "Self, health, overall life outlook, appearance",
+    2: "Wealth, speech, family, accumulated resources",
+    3: "Courage, short journeys, siblings, communication",
+    4: "Home, mother, property, emotional security",
+    5: "Children, creativity, education, speculation, romance",
+    6: "Enemies, debts, disease, service, legal disputes",
+    7: "Partnerships, marriage, contracts, business deals",
+    8: "Longevity, hidden matters, inheritance, transformation",
+    9: "Dharma, higher learning, father, fortune, spirituality",
+    10: "Career, status, authority, public reputation",
+    11: "Gains, income, social networks, fulfilment of desires",
+    12: "Losses, foreign lands, liberation, isolation, expenses",
+}
+
+_PRASHNA_HOUSE_BY_TOPIC = {
+    "marriage": 7,
+    "relationship": 7,
+    "partner": 7,
+    "love": 5,
+    "romance": 5,
+    "career": 10,
+    "job": 10,
+    "work": 10,
+    "business": 7,
+    "money": 2,
+    "wealth": 2,
+    "finance": 2,
+    "health": 1,
+    "illness": 6,
+    "disease": 6,
+    "children": 5,
+    "child": 5,
+    "property": 4,
+    "home": 4,
+    "house": 4,
+    "education": 5,
+    "travel": 9,
+    "foreign": 12,
+    "spiritual": 9,
+    "enemy": 6,
+    "court": 6,
+    "legal": 6,
+}
+
+
+def _detect_question_house(question: str) -> int:
+    """Detect the primary house relevant to the prashna question."""
+    q_lower = question.lower()
+    for keyword, house in _PRASHNA_HOUSE_BY_TOPIC.items():
+        if keyword in q_lower:
+            return house
+    return 1  # Default: house 1 (self/general outlook)
+
+
+def compute_prashna_kundli(
+    question: str,
+    query_time_iso: str | None = None,
+    latitude: float = 28.6139,
+    longitude: float = 77.2090,
+    timezone_name: str = "Asia/Kolkata",
+) -> dict[str, Any]:
+    """
+    Compute a Prashna (Horary) Kundli for the moment the question is asked.
+
+    question: the user's question text
+    query_time_iso: ISO datetime string; defaults to now
+    latitude/longitude: location where question is asked
+    Returns prashna chart + AI-ready interpretation context.
+    """
+    from datetime import timezone as _tz
+
+    if query_time_iso:
+        try:
+            query_dt = datetime.fromisoformat(query_time_iso)
+        except ValueError:
+            query_dt = datetime.now(_tz.utc)
+    else:
+        query_dt = datetime.now(_tz.utc)
+
+    # Build synthetic birth_data for the moment of query
+    birth_data = {
+        "date": query_dt.strftime("%Y-%m-%d"),
+        "time": query_dt.strftime("%H:%M"),
+        "timezone": timezone_name,
+        "location": f"Query location ({latitude:.2f}N, {longitude:.2f}E)",
+        "latitude": latitude,
+        "longitude": longitude,
+    }
+
+    # Compute chart for this moment
+    prashna_facts = compute_kundli_facts(birth_data)
+
+    primary_house = _detect_question_house(question)
+    house_signification = _PRASHNA_HOUSE_SIGNIFICATIONS.get(primary_house, "")
+
+    # Lagna & Moon as key prashna indicators
+    lagna = prashna_facts.get("lagna_sign", "Unknown")
+    lagna_lord = SIGN_LORDS.get(lagna, "Unknown")
+    moon_sign = prashna_facts.get("planets", {}).get("Moon", {}).get("sign", "Unknown")
+    moon_nakshatra = prashna_facts.get("planets", {}).get("Moon", {}).get("nakshatra", "Unknown")
+
+    # House lord of the primary house
+    primary_sign_idx = (SIGNS.index(lagna) + primary_house - 1) % 12 if lagna in SIGNS else 0
+    primary_sign = SIGNS[primary_sign_idx]
+    primary_lord = SIGN_LORDS.get(primary_sign, "Unknown")
+
+    # Is primary lord well-placed? (Simple check: in own sign, exaltation, or strong house)
+    primary_lord_info = prashna_facts.get("planets", {}).get(primary_lord, {})
+    primary_lord_house = primary_lord_info.get("house", 0)
+    lord_in_good_house = primary_lord_house in (1, 4, 5, 7, 9, 10, 11)
+
+    # Moon's applying aspect (simplified: waxing → positive, waning → challenging)
+    moon_long = prashna_facts.get("planets", {}).get("Moon", {}).get("longitude_sidereal", 0)
+    sun_long = prashna_facts.get("planets", {}).get("Sun", {}).get("longitude_sidereal", 0)
+    moon_phase_deg = (moon_long - sun_long) % 360
+    moon_waxing = moon_phase_deg < 180
+
+    verdict_positive = lord_in_good_house and moon_waxing
+
+    return {
+        "question": question,
+        "prashna_time": query_dt.isoformat(),
+        "prashna_lagna": lagna,
+        "prashna_lagna_lord": lagna_lord,
+        "moon_sign": moon_sign,
+        "moon_nakshatra": moon_nakshatra,
+        "moon_waxing": moon_waxing,
+        "primary_house": primary_house,
+        "primary_house_signification": house_signification,
+        "primary_house_sign": primary_sign,
+        "primary_house_lord": primary_lord,
+        "primary_house_lord_placement": primary_lord_house,
+        "lord_well_placed": lord_in_good_house,
+        "prashna_chart": prashna_facts,
+        "verdict": "Favourable" if verdict_positive else "Challenging",
+        "summary": (
+            f"Prashna Lagna: {lagna} (ruled by {lagna_lord}). "
+            f"Moon in {moon_sign} / {moon_nakshatra} — {'waxing (positive energy)' if moon_waxing else 'waning (obstacles indicated)'}. "
+            f"The {primary_house}th house ({house_signification}) governs your question. "
+            f"Its lord {primary_lord} is in house {primary_lord_house} — "
+            f"{'well-placed, supporting a positive outcome' if lord_in_good_house else 'not optimally placed; careful navigation needed'}. "
+            f"Overall verdict: {('Favourable' if verdict_positive else 'Challenging')}."
+        ),
+        "interpretation_context": (
+            f"This is a Prashna (horary) chart for the question: '{question}'. "
+            f"The Lagna ({lagna}) and Moon sign ({moon_sign}) are the primary indicators. "
+            f"The {primary_house}th house lord ({primary_lord}) is in house {primary_lord_house}. "
+            f"Use classical Prashna rules from Prashna Marga and Prashna Tantra to interpret "
+            f"the full chart, paying attention to the Lagna lord's strength and the Moon's applying aspects."
+        ),
+    }
