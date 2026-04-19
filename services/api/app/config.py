@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     # When set, RTDN webhooks are verified via OAuth2 JWT instead of HMAC.
     google_pubsub_audience: Optional[str] = None
     anthropic_api_key: Optional[str] = None
+    # OpenAI / OpenAI-compatible (fallback after Ollama + Groq)
+    openai_api_key: Optional[str] = None
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_model: str = "gpt-4o-mini"
+    # Groq (free tier, OpenAI-compatible)
+    groq_api_key: Optional[str] = None
+    groq_model: str = "llama-3.3-70b-versatile"
     # PostgreSQL connection string. When set, the API uses Postgres instead of SQLite.
     # Format: postgresql://user:password@host:5432/dbname
     database_url: str = ""

@@ -7,6 +7,7 @@ python-jose[cryptography]==3.3.0
 orjson==3.10.12
 pyswisseph==2.10.3.2
 anthropic>=0.40.0
+openai>=1.0.0
 python-multipart==0.0.20
 psycopg2-binary>=2.9.9
 bcrypt>=4.2.0

@@ -1218,29 +1218,69 @@ async def _llm_answer(
     system_prompt: str,
     user_message: str,
 ) -> tuple[Optional[str], str]:
-    """Try Claude first, then local LLM. Returns (text, engine_label)."""
-    # 1. Claude (cloud)
-    try:
-        import anthropic  # lazy import
-        key = settings.anthropic_api_key
-        if key:
-            client = anthropic.Anthropic(api_key=key)
-            message = client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=1024,
-                messages=[{"role": "user", "content": user_message}],
-                system=system_prompt,
-            )
-            return message.content[0].text, "claude-sonnet-4-6"
-    except Exception:
-        pass
-
-    # 2. Local LLM (Ollama / vllm / LM Studio)
+    """Waterfall: Ollama → Groq → OpenAI → Claude → deterministic."""
+    # 1. Local LLM (Ollama / vllm / LM Studio) — free, primary
     local_answer = await _local_llm_answer(system_prompt, user_message)
     if local_answer:
         return local_answer, f"local:{settings.local_llm_model}"
 
-    # 3. Deterministic fallback
+    # 2. Groq (free tier, OpenAI-compatible)
+    groq_key = settings.groq_api_key
+    if groq_key:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": settings.groq_model,
+                        "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}],
+                        "max_tokens": 1024,
+                        "temperature": 0.7,
+                    },
+                )
+                resp.raise_for_status()
+                return resp.json()["choices"][0]["message"]["content"], f"groq:{settings.groq_model}"
+        except Exception:
+            pass
+
+    # 3. OpenAI (paid, cheap — gpt-4o-mini)
+    oai_key = settings.openai_api_key
+    if oai_key:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    f"{settings.openai_base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {oai_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": settings.openai_model,
+                        "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}],
+                        "max_tokens": 1024,
+                        "temperature": 0.7,
+                    },
+                )
+                resp.raise_for_status()
+                return resp.json()["choices"][0]["message"]["content"], f"openai:{settings.openai_model}"
+        except Exception:
+            pass
+
+    # 4. Anthropic Claude (paid, high quality — final cloud fallback)
+    anthropic_key = settings.anthropic_api_key
+    if anthropic_key:
+        try:
+            import anthropic  # lazy import
+            client = anthropic.Anthropic(api_key=anthropic_key)
+            message = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": user_message}],
+                system=system_prompt,
+            )
+            return message.content[0].text, "claude-haiku-4-5-20251001"
+        except Exception:
+            pass
+
+    # 5. Deterministic fallback
     return None, "deterministic"
 
 

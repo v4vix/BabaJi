@@ -53,9 +53,17 @@ services:
           name: babaji-kb
           type: web
           property: hostWithScheme
-      # Optional — set for full AI narratives
+      # ── AI keys — waterfall: Ollama → Groq → OpenAI → Anthropic ──────────
+      - key: GROQ_API_KEY
+        sync: false          # free tier — https://console.groq.com
+      - key: OPENAI_API_KEY
+        sync: false          # gpt-4o-mini, cheap paid fallback
+      - key: OPENAI_BASE_URL
+        sync: false          # default: https://api.openai.com/v1
+      - key: OPENAI_MODEL
+        sync: false          # default: gpt-4o-mini
       - key: ANTHROPIC_API_KEY
-        sync: false
+        sync: false          # claude-haiku, final cloud fallback
       # Optional — Stripe
       - key: STRIPE_SECRET_KEY
         sync: false
