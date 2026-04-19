@@ -38,6 +38,9 @@ services:
         sync: false
       - key: ALLOW_INSECURE_DEMO_AUTH
         value: "false"
+      # CORS — override the localhost default with production URLs
+      - key: CORS_ORIGINS
+        sync: false          # e.g. https://babaji-web.onrender.com,https://your-app.com
       - key: SEED_DEMO_ACCOUNTS
         value: "true"
       - key: EXPOSE_SEED_ACCOUNT_CATALOG
