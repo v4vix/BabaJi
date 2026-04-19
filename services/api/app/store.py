@@ -18,8 +18,15 @@ DB_PATH = Path(__file__).resolve().parent.parent / "cortex_api.sqlite3"
 
 # ── Database abstraction (SQLite default; Postgres when DATABASE_URL is set) ──
 
-_DATABASE_URL: str = os.environ.get("DATABASE_URL", "")
-_IS_POSTGRES = _DATABASE_URL.startswith(("postgresql://", "postgres://"))
+_DATABASE_URL_RAW: str = os.environ.get("DATABASE_URL", "")
+_IS_POSTGRES = _DATABASE_URL_RAW.startswith(("postgresql://", "postgres://"))
+# Enforce TLS for all external providers (Neon, Supabase, etc.).
+# Skip only for localhost / 127.0.0.1 where SSL isn't available.
+if _IS_POSTGRES and "sslmode=" not in _DATABASE_URL_RAW and "localhost" not in _DATABASE_URL_RAW and "127.0.0.1" not in _DATABASE_URL_RAW:
+    _sep = "&" if "?" in _DATABASE_URL_RAW else "?"
+    _DATABASE_URL = f"{_DATABASE_URL_RAW}{_sep}sslmode=require"
+else:
+    _DATABASE_URL = _DATABASE_URL_RAW
 
 # Assign the write lock now that _IS_POSTGRES is known.
 _LOCK: threading.Lock | contextlib.AbstractContextManager = (
