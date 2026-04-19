@@ -52,7 +52,7 @@ services:
         fromService:
           name: babaji-kb
           type: web
-          property: host
+          property: hostWithScheme
       # Optional — set for full AI narratives
       - key: ANTHROPIC_API_KEY
         sync: false
