@@ -15,59 +15,61 @@ services:
         value: 3.11.9
 
       # ── Database ──────────────────────────────────────────────────────────────
-      # FREE TIER:  set DATABASE_URL manually in the Render dashboard to your
-      #             Supabase or Neon connection string (postgresql://...).
-      #             The render-managed babaji-db below is NOT created in free mode.
-      #
-      # PRODUCTION: delete the sync:false line below and uncomment fromDatabase
-      #             so Render auto-wires the managed Postgres instance.
+      # Set DATABASE_URL in the Render dashboard to your Neon or Supabase
+      # postgresql:// connection string. TLS is enforced automatically.
       - key: DATABASE_URL
         sync: false
-      # - key: DATABASE_URL          # ← uncomment for production (Render Postgres)
-      #   fromDatabase:
-      #     name: babaji-db
-      #     property: connectionString
 
+      # ── Secrets (Render auto-generates cryptographically random values) ────
       - key: API_SECRET
         generateValue: true
       - key: ADMIN_API_TOKEN
         generateValue: true
       - key: JWT_SECRET
         generateValue: true
+      - key: SEED_ACCOUNT_PASSWORD
+        generateValue: true    # find value in dashboard → babaji-api → Environment
+
+      # ── URLs ──────────────────────────────────────────────────────────────
       - key: APP_BASE_URL
-        sync: false
+        value: https://babaji-web.onrender.com
       - key: ALLOW_INSECURE_DEMO_AUTH
         value: "false"
-      # CORS — override the localhost default with production URLs
+
+      # ── CORS ──────────────────────────────────────────────────────────────
       - key: CORS_ORIGINS
-        sync: false          # e.g. https://babaji-web.onrender.com,https://your-app.com
+        value: https://babaji-web.onrender.com
+
+      # ── Demo seeding ──────────────────────────────────────────────────────
       - key: SEED_DEMO_ACCOUNTS
         value: "true"
       - key: EXPOSE_SEED_ACCOUNT_CATALOG
         value: "true"
-      - key: SEED_ACCOUNT_PASSWORD
-        sync: false
       - key: ADMIN_EMAILS
         value: admin@babaji.app
       - key: SUPPORT_EMAILS
         value: support@babaji.app
+
+      # ── Inter-service wiring ───────────────────────────────────────────────
       - key: KB_SERVICE_URL
         fromService:
           name: babaji-kb
           type: web
           property: hostWithScheme
+
       # ── AI keys — waterfall: Ollama → Groq → OpenAI → Anthropic ──────────
       - key: GROQ_API_KEY
-        sync: false          # free tier — https://console.groq.com
+        sync: false            # free tier — https://console.groq.com
       - key: OPENAI_API_KEY
-        sync: false          # gpt-4o-mini, cheap paid fallback
+        sync: false            # gpt-4o-mini, cheap paid fallback
       - key: OPENAI_BASE_URL
-        sync: false          # default: https://api.openai.com/v1
+        sync: false            # default: https://api.openai.com/v1
       - key: OPENAI_MODEL
-        sync: false          # default: gpt-4o-mini
+        sync: false            # default: gpt-4o-mini
       - key: ANTHROPIC_API_KEY
-        sync: false          # claude-haiku, final cloud fallback
-      # Optional — Stripe
+        sync: false            # claude-haiku, final cloud fallback
+
+      # ── Optional — Stripe ─────────────────────────────────────────────────
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
@@ -78,7 +80,8 @@ services:
         sync: false
       - key: STRIPE_PRICE_ELITE
         sync: false
-      # Optional — Email
+
+      # ── Optional — Email ──────────────────────────────────────────────────
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
@@ -89,7 +92,8 @@ services:
         sync: false
       - key: SMTP_FROM
         value: noreply@babaji.app
-      # Optional — Sentry
+
+      # ── Optional — Sentry ─────────────────────────────────────────────────
       - key: SENTRY_DSN
         sync: false
 
@@ -111,13 +115,8 @@ services:
           name: babaji-api
           type: web
           envVarKey: ADMIN_API_TOKEN
-      # Same pattern as babaji-api — set manually for free tier, fromDatabase for production
       - key: DATABASE_URL
-        sync: false
-      # - key: DATABASE_URL          # ← uncomment for production (Render Postgres)
-      #   fromDatabase:
-      #     name: babaji-db
-      #     property: connectionString
+        sync: false            # same Neon/Supabase URL as babaji-api
 
   # ── Next.js Web App ───────────────────────────────────────────────────────────
   - type: web
@@ -135,22 +134,21 @@ services:
         fromService:
           name: babaji-api
           type: web
-          property: host
-      # Optional
+          property: hostWithScheme  # gives https://babaji-api.onrender.com
+      # ── Optional ──────────────────────────────────────────────────────────
       - key: NEXT_PUBLIC_SENTRY_DSN
         sync: false
       - key: NEXT_PUBLIC_GOOGLE_ANALYTICS_ID
         sync: false
 
-# ── Production Postgres (Render-managed) ─────────────────────────────────────
-# Uncomment this entire block when moving to production.
-# Also uncomment the fromDatabase lines in babaji-api and babaji-kb above,
-# and remove the sync:false DATABASE_URL entries.
+# ── Upgrade path: Render-managed Postgres ─────────────────────────────────────
+# When moving off free external DB, uncomment this block, remove the
+# sync:false DATABASE_URL entries above, and replace with fromDatabase refs.
 #
 # databases:
 #   - name: babaji-db
-#     plan: basic-256mb      # upgrade to standard-0 for production workloads
+#     plan: basic-256mb
 #     region: oregon
 #     databaseName: babaji
 #     user: babaji
-#     ipAllowList: []        # restrict to service IPs in production
+#     ipAllowList: []
