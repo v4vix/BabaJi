@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Surface } from "@cortex/ui";
@@ -18,7 +18,7 @@ const PLAN_PERKS: Record<string, string[]> = {
   elite: ["Everything in Pro", "Vaastu Studio", "Gem Consultancy", "Live Consult Video"],
 };
 
-export default function BillingSuccessPage() {
+function BillingSuccessContent() {
   const params = useSearchParams();
   const plan = params.get("plan") ?? "plus";
   const label = PLAN_LABELS[plan] ?? plan;
@@ -103,5 +103,13 @@ export default function BillingSuccessPage() {
         </div>
       </Surface>
     </main>
+  );
+}
+
+export default function BillingSuccessPage() {
+  return (
+    <Suspense>
+      <BillingSuccessContent />
+    </Suspense>
   );
 }
