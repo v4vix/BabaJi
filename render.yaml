@@ -52,10 +52,7 @@ services:
 
       # ── Inter-service wiring ───────────────────────────────────────────────
       - key: KB_SERVICE_URL
-        fromService:
-          name: babaji-kb
-          type: web
-          property: hostWithScheme
+        value: https://babaji-kb.onrender.com
 
       # ── AI keys — waterfall: Ollama → Groq → OpenAI → Anthropic ──────────
       - key: GROQ_API_KEY
@@ -131,10 +128,7 @@ services:
       - key: NODE_VERSION
         value: 22.22.0
       - key: NEXT_PUBLIC_API_BASE
-        fromService:
-          name: babaji-api
-          type: web
-          property: hostWithScheme  # gives https://babaji-api.onrender.com
+        value: https://babaji-api.onrender.com
       # ── Optional ──────────────────────────────────────────────────────────
       - key: NEXT_PUBLIC_SENTRY_DSN
         sync: false
