@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  transpilePackages: ['@cortex/ui', '@cortex/reports', '@cortex/astrology-kb'],
   async rewrites() {
     // In production, NEXT_PUBLIC_API_BASE is set and the frontend calls the API directly.
     // In local dev (no NEXT_PUBLIC_API_BASE), proxy /v1/* to the FastAPI backend.
