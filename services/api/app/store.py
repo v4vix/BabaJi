@@ -97,7 +97,7 @@ class _Conn:
                 "SELECT column_name FROM information_schema.columns WHERE table_name = %s",
                 (table_name,),
             )
-            return {row[0] for row in cur.fetchall()}
+            return {row['column_name'] for row in cur.fetchall()}
         rows = self._raw.execute(f"PRAGMA table_info({table_name})").fetchall()
         return {str(row["name"]) for row in rows}
 
