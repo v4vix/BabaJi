@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@cortex/api-types": "workspace:*",
     "@cortex/astrology-kb": "workspace:*",
     "@cortex/reports": "workspace:*",
     "@cortex/ui": "workspace:*",
