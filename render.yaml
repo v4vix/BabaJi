@@ -121,7 +121,7 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: corepack enable && corepack pnpm install --frozen-lockfile && corepack pnpm --filter web build
+    buildCommand: corepack enable && corepack pnpm install --frozen-lockfile && corepack pnpm --filter "...web" build
     startCommand: cd apps/web && corepack pnpm start
     autoDeploy: true
     envVars:
