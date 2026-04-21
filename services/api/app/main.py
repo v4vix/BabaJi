@@ -110,6 +110,10 @@ from .schemas import (
     TransitImpact,
     TransitImpactRequest,
     TransitImpactResponse,
+    MarriageTimingRequest,
+    MarriageTimingResponse,
+    MarriageDashaWindow,
+    MarriageIndicator,
 )
 from .jyotish import (
     DASHA_LORD_MEANINGS,
@@ -121,6 +125,7 @@ from .jyotish import (
     compute_ashtakavarga,
     compute_kundli_facts,
     compute_prashna_kundli,
+    compute_marriage_timing,
     compute_sade_sati,
     get_current_transits,
     panchang_for_date,
@@ -3848,4 +3853,37 @@ async def transit_impact(
             "They do not constitute medical, legal, or financial advice. "
             "For significant life decisions, consult a qualified Jyotishi."
         ),
+    )
+
+
+# ─── Marriage Timing ──────────────────────────────────────────────────────────
+
+@app.post("/v1/marriage-timing/analyze", response_model=MarriageTimingResponse, tags=["marriage"])
+async def marriage_timing_analyze(
+    request: MarriageTimingRequest,
+    ctx: dict[str, Any] = Depends(entitlement_context),
+) -> MarriageTimingResponse:
+    """
+    Analyse the natal chart for marriage timing indicators.
+
+    Returns 7th house details, Venus/Jupiter positions, and ranked
+    Vimshottari dasha windows most likely to coincide with marriage.
+    """
+    require_entitlement(ctx, "kundli.report")
+
+    birth = request.birth.model_dump()
+    try:
+        result = compute_marriage_timing(birth, ayanamsha=request.ayanamsha, gender=request.gender)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Chart computation failed: {exc}") from exc
+
+    return MarriageTimingResponse(
+        seventh_house_sign=result["seventh_house_sign"],
+        seventh_lord=result["seventh_lord"],
+        planets_in_7th=result["planets_in_7th"],
+        indicators=[MarriageIndicator(**i) for i in result["indicators"]],
+        dasha_windows=[MarriageDashaWindow(**w) for w in result["dasha_windows"]],
+        top_window=MarriageDashaWindow(**result["top_window"]) if result["top_window"] else None,
+        summary=result["summary"],
+        disclaimer=result["disclaimer"],
     )

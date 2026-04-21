@@ -640,3 +640,40 @@ class TransitImpactResponse(BaseModel):
     generated_at: str
     summary: str
     disclaimer: str
+
+
+# ─── Marriage Timing ──────────────────────────────────────────────────────────
+
+class MarriageTimingRequest(BaseModel):
+    birth: BirthInput
+    gender: str = "unknown"
+    ayanamsha: str = "Lahiri"
+
+
+class MarriageDashaWindow(BaseModel):
+    mahadasha_lord: str
+    emoji: str
+    start_date: str
+    end_date: str
+    age_range: str
+    score: int
+    is_7th_lord: bool
+    is_karaka: bool
+    reason: str
+
+
+class MarriageIndicator(BaseModel):
+    label: str
+    value: str
+    detail: str
+
+
+class MarriageTimingResponse(BaseModel):
+    seventh_house_sign: str
+    seventh_lord: str
+    planets_in_7th: list[str]
+    indicators: list[MarriageIndicator]
+    dasha_windows: list[MarriageDashaWindow]
+    top_window: MarriageDashaWindow | None
+    summary: str
+    disclaimer: str

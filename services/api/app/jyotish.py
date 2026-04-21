@@ -1363,3 +1363,200 @@ def compute_prashna_kundli(
             f"the full chart, paying attention to the Lagna lord's strength and the Moon's applying aspects."
         ),
     }
+
+
+# ─── Marriage Timing Analysis ─────────────────────────────────────────────────
+
+_MARRIAGE_DASHA_WEIGHTS: dict[str, int] = {
+    "Venus": 10, "Jupiter": 8, "Moon": 6, "Rahu": 6,
+    "Mercury": 4, "Sun": 3, "Mars": 3, "Saturn": 2, "Ketu": 2,
+}
+
+_PLANET_EMOJIS: dict[str, str] = {
+    "Sun": "☉", "Moon": "☽", "Mars": "♂", "Mercury": "☿",
+    "Jupiter": "♃", "Saturn": "♄", "Venus": "♀", "Rahu": "☊", "Ketu": "☋",
+}
+
+
+def _age_at_date(birth_date_str: str, target_date_str: str) -> float:
+    from datetime import date as _date
+    b = _date.fromisoformat(birth_date_str[:10])
+    t = _date.fromisoformat(target_date_str[:10])
+    return (t - b).days / 365.25
+
+
+def compute_marriage_timing(
+    birth: dict[str, Any],
+    *,
+    ayanamsha: str = "Lahiri",
+    gender: str = "unknown",
+) -> dict[str, Any]:
+    """
+    Analyse the natal chart for marriage timing indicators.
+
+    Returns:
+        - 7th house details (sign, lord, planets in 7th)
+        - Venus and Jupiter positions
+        - Top dasha windows ranked by marriage probability
+        - A narrative summary
+    """
+    facts = compute_kundli_facts(birth, ayanamsha=ayanamsha)
+    planets = facts["planet_positions"]
+    lagna_sign: str = facts["lagna"]["sign"]
+    lagna_deg: float = facts["lagna"]["degree"]
+
+    # 7th house sign
+    lagna_idx = SIGNS.index(lagna_sign)
+    seventh_sign = SIGNS[(lagna_idx + 6) % 12]
+    seventh_lord = SIGN_LORDS[seventh_sign]
+
+    # Planets in 7th house
+    planets_in_7th = [
+        name for name, p in planets.items() if p["house"] == 7
+    ]
+
+    # Venus and Jupiter positions
+    venus_pos = planets.get("Venus", {})
+    jupiter_pos = planets.get("Jupiter", {})
+    moon_pos = planets.get("Moon", {})
+
+    # 7th lord position
+    seventh_lord_pos = planets.get(seventh_lord, {})
+
+    # --- Dasha windows ---
+    dasha_timeline: list[dict[str, Any]] = facts.get("vimshottari_timeline", [])
+    birth_date_str = birth.get("date", "1990-01-01")
+
+    windows: list[dict[str, Any]] = []
+    for period in dasha_timeline:
+        maha_planet = period.get("lord", "")
+        maha_start = period.get("start", "")
+        maha_end = period.get("end", "")
+
+        # Score this mahadasha
+        score = _MARRIAGE_DASHA_WEIGHTS.get(maha_planet, 2)
+
+        # Boost if maha planet is 7th lord
+        if maha_planet == seventh_lord:
+            score += 5
+        # Boost if maha planet is in 7th house
+        if planets.get(maha_planet, {}).get("house") == 7:
+            score += 3
+        # Boost if maha planet is Venus or Jupiter (natural karakas)
+        if maha_planet in ("Venus", "Jupiter"):
+            score += 2
+
+        age_start = _age_at_date(birth_date_str, maha_start)
+        age_end = _age_at_date(birth_date_str, maha_end)
+
+        # Only include periods covering age 18-55
+        if age_end < 18 or age_start > 55:
+            continue
+
+        windows.append({
+            "mahadasha_lord": maha_planet,
+            "emoji": _PLANET_EMOJIS.get(maha_planet, ""),
+            "start_date": maha_start,
+            "end_date": maha_end,
+            "age_range": f"{max(18, round(age_start, 1))}–{min(55, round(age_end, 1))}",
+            "score": min(score, 10),
+            "is_7th_lord": maha_planet == seventh_lord,
+            "is_karaka": maha_planet in ("Venus", "Jupiter"),
+            "reason": _marriage_window_reason(maha_planet, seventh_lord, planets_in_7th),
+        })
+
+    windows.sort(key=lambda x: -x["score"])
+
+    # Key indicators narrative
+    karaka = "Jupiter" if gender.lower() in ("female", "f", "woman") else "Venus"
+    karaka_pos = planets.get(karaka, {})
+    karaka_house = karaka_pos.get("house", "?")
+    karaka_sign = karaka_pos.get("sign", "?")
+
+    indicators = [
+        {
+            "label": "7th House (Primary)",
+            "value": f"{seventh_sign} — ruled by {seventh_lord} ({_PLANET_EMOJIS.get(seventh_lord, '')})",
+            "detail": f"{seventh_lord} sits in house {seventh_lord_pos.get('house', '?')} ({seventh_lord_pos.get('sign', '?')})"
+                      + (f" — in its own/exaltation sign" if seventh_lord_pos.get("sign") in (seventh_sign,) else ""),
+        },
+        {
+            "label": f"{karaka} — Marriage Karaka",
+            "value": f"{karaka} in {karaka_sign} (House {karaka_house})",
+            "detail": (
+                f"{karaka} in house {karaka_house} {'strongly' if karaka_house in (1, 2, 5, 7, 9, 10, 11) else 'weakly'} "
+                f"supports marriage prospects"
+            ),
+        },
+        {
+            "label": "Planets in 7th House",
+            "value": ", ".join(planets_in_7th) if planets_in_7th else "None — clean 7th house",
+            "detail": (
+                "Benefics (Venus, Jupiter, Mercury, Moon) in 7th strengthen partnerships; "
+                "malefics (Mars, Saturn, Rahu, Ketu) need careful analysis."
+            ) if planets_in_7th else "An empty 7th house directs the analysis to its lord.",
+        },
+        {
+            "label": "Moon Sign",
+            "value": f"{moon_pos.get('sign', '?')} (House {moon_pos.get('house', '?')})",
+            "detail": "The Moon's sign reveals emotional needs in partnership and the dasha seed for timing.",
+        },
+    ]
+
+    # Summary narrative
+    top_windows = windows[:3]
+    if top_windows:
+        best = top_windows[0]
+        summary = (
+            f"Your 7th house is {seventh_sign}, ruled by {seventh_lord}. "
+            f"The primary marriage window indicated is during the "
+            f"{best['mahadasha_lord']} Mahadasha (ages {best['age_range']}), "
+            f"which scores {best['score']}/10 for marriage activation. "
+        )
+        if len(top_windows) > 1:
+            summary += (
+                f"Secondary windows: {top_windows[1]['mahadasha_lord']} Mahadasha "
+                f"(ages {top_windows[1]['age_range']}). "
+            )
+        summary += (
+            "For precise timing within these dashas, check Venus/Jupiter transits "
+            "over the 7th house and its lord. "
+            "This is an indicative classical analysis — consult a qualified Jyotishi for confirmation."
+        )
+    else:
+        summary = (
+            "Could not compute marriage windows for the specified birth data. "
+            "Please verify the birth date, time, and location."
+        )
+
+    return {
+        "seventh_house_sign": seventh_sign,
+        "seventh_lord": seventh_lord,
+        "planets_in_7th": planets_in_7th,
+        "indicators": indicators,
+        "dasha_windows": windows[:8],
+        "top_window": top_windows[0] if top_windows else None,
+        "summary": summary,
+        "disclaimer": (
+            "Marriage timing is a highly specialised area of Jyotish that requires analysis "
+            "of multiple charts (D1, D9), transits, and consultation with a qualified Jyotishi. "
+            "This reading is indicative only and does not constitute personal, legal, or relationship advice."
+        ),
+    }
+
+
+def _marriage_window_reason(planet: str, seventh_lord: str, planets_in_7th: list[str]) -> str:
+    reasons: list[str] = []
+    if planet == seventh_lord:
+        reasons.append(f"{planet} is the 7th lord — its dasha directly activates the house of marriage")
+    if planet == "Venus":
+        reasons.append("Venus is the natural karaka of love and partnerships")
+    if planet == "Jupiter":
+        reasons.append("Jupiter dasha often brings auspicious events including marriage")
+    if planet == "Rahu":
+        reasons.append("Rahu dasha can trigger sudden or unconventional unions")
+    if planet in planets_in_7th:
+        reasons.append(f"{planet} is placed in the 7th house — its dasha activates it directly")
+    if not reasons:
+        reasons.append(f"{planet} dasha — moderate marriage potential based on classical rules")
+    return "; ".join(reasons)

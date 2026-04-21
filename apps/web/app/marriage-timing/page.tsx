@@ -4,6 +4,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Surface } from "@cortex/ui";
+import { postJson } from "../../lib/api";
+
+type DashaWindow = {
+  mahadasha_lord: string; emoji: string; start_date: string; end_date: string;
+  age_range: string; score: number; is_7th_lord: boolean; is_karaka: boolean; reason: string;
+};
+type Indicator = { label: string; value: string; detail: string };
+type MarriageResult = {
+  seventh_house_sign: string; seventh_lord: string; planets_in_7th: string[];
+  indicators: Indicator[]; dasha_windows: DashaWindow[];
+  top_window: DashaWindow | null; summary: string; disclaimer: string;
+};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -84,18 +96,38 @@ export default function MarriageTimingPage() {
   const [birthPlace, setBirthPlace] = useState("Delhi");
   const [timezone, setTimezone] = useState("Asia/Kolkata");
   const [selectedLagna, setSelectedLagna] = useState("Aries");
+  const [latitude, setLatitude] = useState("28.6139");
+  const [longitude, setLongitude] = useState("77.2090");
+  const [gender, setGender] = useState("unknown");
+
+  const [analysisResult, setAnalysisResult] = useState<MarriageResult | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const seventhLord = LAGNA_7TH_LORD[selectedLagna] ?? "Depends on chart";
 
   function goToKundli() {
     const params = new URLSearchParams({
-      date: dob,
-      time: tob,
-      location: birthPlace,
-      timezone,
+      date: dob, time: tob, location: birthPlace, timezone,
       question: "What are the key indications and timing for marriage in my chart?",
     });
     router.push(`/kundli?${params.toString()}`);
+  }
+
+  async function runAnalysis() {
+    setAnalysisError(null); setAnalysisResult(null);
+    const lat = parseFloat(latitude); const lon = parseFloat(longitude);
+    if (isNaN(lat) || isNaN(lon)) { setAnalysisError("Please enter valid latitude and longitude."); return; }
+    setAnalysisLoading(true);
+    try {
+      const data = await postJson<MarriageResult>("/v1/marriage-timing/analyze", {
+        birth: { date: dob, time: tob, timezone, location: birthPlace, latitude: lat, longitude: lon },
+        gender,
+      });
+      setAnalysisResult(data);
+    } catch (e) {
+      setAnalysisError(e instanceof Error ? e.message : "Analysis failed.");
+    } finally { setAnalysisLoading(false); }
   }
 
   return (
@@ -219,23 +251,135 @@ export default function MarriageTimingPage() {
               </select>
             </div>
 
-            <div className="soft-note">
-              The Kundli analysis covers 7th house, 7th lord, Venus, Navamsa D9, and current Vimshottari dasha
-              — everything needed for a complete marriage timing reading.
+            <div className="form-grid">
+              <div className="field">
+                <label>Latitude</label>
+                <input type="number" step="0.0001"
+                  style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px", fontSize: 14, background: "#fff", color: "#0f172a", width: "100%", boxSizing: "border-box" }}
+                  value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="28.6139" />
+              </div>
+              <div className="field">
+                <label>Longitude</label>
+                <input type="number" step="0.0001"
+                  style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px", fontSize: 14, background: "#fff", color: "#0f172a", width: "100%", boxSizing: "border-box" }}
+                  value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="77.2090" />
+              </div>
             </div>
+
+            <div className="field">
+              <label>Gender (affects marriage karaka)</label>
+              <select
+                style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px", fontSize: 14, background: "#fff", color: "#0f172a", width: "100%", cursor: "pointer", boxSizing: "border-box" }}
+                value={gender} onChange={(e) => setGender(e.target.value)}
+              >
+                <option value="unknown">Prefer not to say</option>
+                <option value="male">Male (Venus as karaka)</option>
+                <option value="female">Female (Jupiter as karaka)</option>
+              </select>
+            </div>
+
+            {analysisError && (
+              <div style={{ padding: "10px 14px", borderRadius: 8, fontSize: 13, background: "#fef2f2", color: "#dc2626", border: "1px solid #fca5a5" }}>
+                {analysisError}
+              </div>
+            )}
 
             <div className="button-row">
               <button
                 type="button"
                 className="button"
-                onClick={goToKundli}
-                style={{ background: "linear-gradient(135deg, #005f73, #0a9396)", color: "#fff", border: "none" }}
+                onClick={runAnalysis}
+                disabled={analysisLoading}
+                style={{ background: analysisLoading ? "#94a3b8" : "linear-gradient(135deg, #005f73, #0a9396)", color: "#fff", border: "none" }}
               >
-                Generate Full Kundli for Marriage Analysis →
+                {analysisLoading ? "Analysing chart…" : "💑 Analyse My Chart"}
+              </button>
+              <button type="button" className="button" onClick={goToKundli}
+                style={{ background: "none", border: "1px solid #e2e8f0", color: "#475569" }}>
+                Full Kundli →
               </button>
             </div>
           </div>
         </Surface>
+
+        {analysisResult && (
+          <Surface title="Your Personal Marriage Timing Analysis">
+            <div className="form">
+              {/* Summary */}
+              <div style={{ background: "#f0fafb", borderRadius: 10, padding: "12px 16px", marginBottom: 16, borderLeft: "3px solid #0a9396" }}>
+                <p style={{ fontSize: 14, color: "#0f172a", lineHeight: 1.7, margin: 0 }}>{analysisResult.summary}</p>
+              </div>
+
+              {/* Top window */}
+              {analysisResult.top_window && (
+                <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#16a34a", marginBottom: 4, letterSpacing: "0.06em" }}>
+                    Primary Marriage Window
+                  </div>
+                  <div style={{ fontWeight: 800, fontSize: 18, color: "#0f172a" }}>
+                    {analysisResult.top_window.emoji} {analysisResult.top_window.mahadasha_lord} Mahadasha
+                  </div>
+                  <div style={{ fontSize: 14, color: "#475569", marginTop: 2 }}>
+                    Ages {analysisResult.top_window.age_range} · Score {analysisResult.top_window.score}/10
+                  </div>
+                  <div style={{ fontSize: 13, color: "#64748b", marginTop: 6, lineHeight: 1.5 }}>
+                    {analysisResult.top_window.reason}
+                  </div>
+                </div>
+              )}
+
+              {/* Indicators */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#64748b", marginBottom: 8, letterSpacing: "0.06em" }}>
+                  Chart Indicators
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {analysisResult.indicators.map((ind, i) => (
+                    <div key={i} style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 12px", background: "#f8fafc" }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#005f73", marginBottom: 2 }}>{ind.label}</div>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: "#0f172a", marginBottom: 2 }}>{ind.value}</div>
+                      <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>{ind.detail}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* All dasha windows */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "#64748b", marginBottom: 8, letterSpacing: "0.06em" }}>
+                  Ranked Dasha Windows
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  {analysisResult.dasha_windows.map((w, i) => (
+                    <div key={i} style={{
+                      border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 12px",
+                      display: "flex", gap: 10, alignItems: "center",
+                      background: i === 0 ? "#f0fdf4" : "#f8fafc",
+                      borderColor: i === 0 ? "#86efac" : "#e2e8f0",
+                    }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 8, background: "#e0f2f4", display: "grid", placeItems: "center", fontSize: 18, flexShrink: 0 }}>
+                        {w.emoji}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: "#0f172a" }}>
+                          {w.mahadasha_lord} · Ages {w.age_range}
+                          {w.is_7th_lord && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 800, background: "#dbeafe", color: "#1d4ed8", padding: "1px 5px", borderRadius: 4 }}>7th Lord</span>}
+                          {w.is_karaka && <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 800, background: "#fce7f3", color: "#be185d", padding: "1px 5px", borderRadius: 4 }}>Karaka</span>}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#64748b" }}>{w.reason}</div>
+                      </div>
+                      <div style={{ flexShrink: 0, textAlign: "right" }}>
+                        <div style={{ fontWeight: 800, fontSize: 16, color: w.score >= 8 ? "#16a34a" : w.score >= 6 ? "#0a9396" : "#64748b" }}>{w.score}/10</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 12, lineHeight: 1.5 }}>{analysisResult.disclaimer}</p>
+            </div>
+          </Surface>
+        )}
 
         <Surface title="Classical Age Windows">
           <div className="form">
