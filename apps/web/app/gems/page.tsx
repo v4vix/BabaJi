@@ -190,7 +190,7 @@ export default function GemsPage() {
                 background: "#e0f2f4", borderRadius: 8, padding: "8px 12px",
                 fontSize: "0.85rem", color: "#005f73", fontWeight: 600, marginBottom: 8,
               }}>
-                {selectedPlanetInfo.symbol} {selectedPlanetInfo.planet} → {selectedPlanetInfo.gem}
+                {selectedPlanetInfo.symbol} {selectedPlanetInfo.label} → {selectedPlanetInfo.gem}
               </div>
             )}
 
