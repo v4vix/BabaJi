@@ -9,13 +9,16 @@ import { useToast } from "../lib/toast";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 const FEATURE_LINKS = [
-  { href: "/kundli",      emoji: "🔮", label: "Kundli",      sub: "Birth chart & AI narrative", tier: null },
-  { href: "/vaastu",      emoji: "🏠", label: "Vaastu",      sub: "Space energy analysis",     tier: "Elite" },
-  { href: "/matchmaking", emoji: "💫", label: "Matchmaking", sub: "Compatibility studio",       tier: "Pro" },
-  { href: "/panchang",    emoji: "📅", label: "Panchang",    sub: "Daily muhurta & tithi",      tier: null },
-  { href: "/consult",     emoji: "💬", label: "Consult",     sub: "Live session",               tier: "Elite" },
-  { href: "/insights",    emoji: "✨", label: "Insights",    sub: "Tarot, gems & numerology",   tier: null },
-  { href: "/transits",   emoji: "🪐", label: "Transits",   sub: "Today's planetary impacts",  tier: null },
+  { href: "/kundli",          emoji: "🔮", label: "Kundli",       sub: "Birth chart & AI narrative",  tier: null },
+  { href: "/vaastu",          emoji: "🏠", label: "Vaastu",       sub: "Space energy analysis",        tier: "Elite" },
+  { href: "/matchmaking",     emoji: "💫", label: "Matchmaking",  sub: "Compatibility studio",          tier: "Pro" },
+  { href: "/panchang",        emoji: "📅", label: "Panchang",     sub: "Daily muhurta & tithi",         tier: null },
+  { href: "/consult",         emoji: "💬", label: "Consult",      sub: "Live session",                  tier: "Elite" },
+  { href: "/insights",        emoji: "✨", label: "Insights",     sub: "Tarot, gems & numerology",      tier: null },
+  { href: "/transits",        emoji: "🪐", label: "Transits",     sub: "Today's planetary impacts",     tier: null },
+  { href: "/muhurta",         emoji: "⏰", label: "Muhurta",      sub: "Auspicious timing calculator",  tier: null },
+  { href: "/gems",            emoji: "💎", label: "Gemstones",    sub: "Planetary gem guidance",         tier: null },
+  { href: "/festivals",       emoji: "🪔", label: "Festivals",    sub: "Hindu festival calendar",        tier: null },
 ];
 
 const COMPANY_LINKS = [
