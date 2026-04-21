@@ -612,3 +612,31 @@ class PrashnaResponse(BaseModel):
     summary: str
     interpretation_context: str
     disclaimers: list[str]
+
+
+# ─── Transit Impact ───────────────────────────────────────────────────────────
+
+class TransitImpact(BaseModel):
+    transiting_planet: str
+    natal_planet: str
+    transit_sign: str
+    transit_degree: float
+    natal_house: int
+    aspect_type: str
+    orb_degrees: float
+    intensity: str          # "high" | "medium" | "low"
+    intensity_score: float
+    title: str
+    description: str
+
+
+class TransitImpactRequest(BaseModel):
+    birth: BirthInput
+    ayanamsha: str = "Lahiri"
+
+
+class TransitImpactResponse(BaseModel):
+    transits: list[TransitImpact]
+    generated_at: str
+    summary: str
+    disclaimer: str

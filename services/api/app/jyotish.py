@@ -612,6 +612,220 @@ def pick_muhurta_windows(
     return windows
 
 
+# ─── Transit Impact ──────────────────────────────────────────────────────────
+
+# Base intensity scores (0–10) for transiting planet over natal planet
+_TRANSIT_BASE_INTENSITY: dict[tuple[str, str], tuple[int, str, str]] = {
+    # (transiting, natal): (raw_score, title_template, description_template)
+    ("Moon",    "Sun"):     (9, "Moon transits natal Sun",     "Daily vitality and identity are in flux — energy levels may rise and fall quickly. Stay grounded; emotional reactions can surface unexpectedly."),
+    ("Moon",    "Moon"):    (9, "Moon transits natal Moon",    "Heightened emotional sensitivity today — intuition is sharp, moods are fluid. An auspicious time for introspection, family, and heartfelt conversations."),
+    ("Moon",    "Lagna"):   (8, "Moon transits Ascendant",     "A surge of personal presence and emotional expressiveness. Good for meetings, first impressions, and nurturing self-care routines."),
+    ("Saturn",  "Sun"):     (9, "Saturn crosses natal Sun",    "A period of discipline and identity testing — responsibility increases, shortcuts fail. Commit to long-term work; avoid ego-driven confrontations."),
+    ("Saturn",  "Moon"):    (8, "Saturn crosses natal Moon",   "Emotional heaviness or restriction is likely — practical burdens weigh on the mind. Structure your day carefully and lean on trusted support."),
+    ("Jupiter", "Moon"):    (9, "Jupiter transits natal Moon", "An auspicious expansion of emotional life — family harmony, optimism, and healing are supported. Favorable for starting new ventures or relationships."),
+    ("Jupiter", "Sun"):     (8, "Jupiter transits natal Sun",  "Confidence and opportunity expand — leadership roles, recognition, and growth initiatives are all well-starred. Act on goals set in this window."),
+    ("Jupiter", "Lagna"):   (8, "Jupiter transits Ascendant",  "A broadly auspicious transit — physical vitality, wisdom, and social grace increase. Good for making important decisions and expanding your public presence."),
+    ("Mars",    "Sun"):     (7, "Mars activates natal Sun",    "Energy and ambition run high — excellent for physical effort and bold moves. Guard against impulsiveness; channel the drive purposefully."),
+    ("Mars",    "Moon"):    (7, "Mars activates natal Moon",   "Emotional intensity and restless energy combine — productive if channelled into exercise or decisive action. Avoid needless arguments."),
+    ("Mars",    "Saturn"):  (6, "Mars-Saturn tension",         "Frustration from blocked ambitions or slow progress is possible. Patience and systematic effort are your best strategy; avoid reckless shortcuts."),
+    ("Venus",   "Moon"):    (6, "Venus transits natal Moon",   "Emotional warmth, aesthetic pleasure, and relationship harmony are highlighted. A good day for creative work, romance, and social gatherings."),
+    ("Venus",   "Venus"):   (6, "Venus returns to natal Venus", "A personal Venus return period — relationships, beauty, and comfort come into focus. Celebrate connections and creative projects."),
+    ("Mercury", "Mercury"): (5, "Mercury conjunct natal Mercury", "Mental agility peaks — communication, writing, learning, and negotiation are all flowing well. Use this clarity for planning or difficult conversations."),
+    ("Mercury", "Sun"):     (5, "Mercury activates natal Sun",  "Intellectual confidence increases — good for presentations, signing agreements, and expressing ideas clearly. Trust your analytical instincts."),
+    ("Rahu",    "Sun"):     (7, "Rahu crosses natal Sun",       "Ambitions intensify and unconventional paths open — worldly desires are amplified. Stay discerning; Rahu can obscure reality with allure."),
+    ("Rahu",    "Moon"):    (7, "Rahu crosses natal Moon",      "Mental restlessness and craving for novelty may be unsettling. Avoid impulsive decisions; meditation and grounding practices help stabilise the mind."),
+    ("Ketu",    "Moon"):    (6, "Ketu crosses natal Moon",      "Spiritual withdrawal and emotional detachment are possible — a reflective, inward period. Past patterns may surface for release; honour the introspective pull."),
+    ("Ketu",    "Sun"):     (6, "Ketu crosses natal Sun",       "Ego loosens and spiritual insights deepen — worldly ambitions may feel less compelling. Use this phase for inner work and letting go of outdated identity structures."),
+    ("Saturn",  "Jupiter"): (7, "Saturn squares natal Jupiter", "Expansion meets contraction — idealistic plans face reality checks. Slow, deliberate progress beats optimistic shortcuts in this period."),
+    ("Jupiter", "Saturn"):  (7, "Jupiter expands natal Saturn", "Opportunities to grow within structure arise — career rewards, long-term projects, and institutional gains are well-supported. Trust steady effort."),
+}
+
+# Aspect multipliers: (angle, orb, multiplier, label)
+_ASPECTS: list[tuple[float, float, float, str]] = [
+    (0.0,   5.0, 1.5, "conjunction"),
+    (180.0, 8.0, 1.2, "opposition"),
+    (120.0, 8.0, 0.8, "trine"),
+    (90.0,  8.0, 1.0, "square"),
+    (60.0,  8.0, 0.6, "sextile"),
+]
+
+# House-transit impact descriptions (fallback when planet-pair not in table)
+_HOUSE_TRANSIT_MSGS: dict[str, str] = {
+    "Sun":     "Sun transiting {house_label} — focus, leadership, and identity themes activate in this life area.",
+    "Moon":    "Moon transiting {house_label} — emotional currents and intuitive pulls heighten here.",
+    "Mars":    "Mars entering {house_label} — action, drive, and potential friction animate this life area. Push boldly but with care.",
+    "Mercury": "Mercury through {house_label} — communication, analysis, and quick decisions favour this domain.",
+    "Jupiter": "Jupiter transiting {house_label} — expansion, optimism, and growth bless this area of life.",
+    "Venus":   "Venus gracing {house_label} — beauty, relationships, and pleasurable gains are highlighted here.",
+    "Saturn":  "Saturn crossing {house_label} — discipline and long-term lessons consolidate this life area. Patient effort is rewarded.",
+    "Rahu":    "Rahu transiting {house_label} — obsessive focus and unconventional energy surge into this domain.",
+    "Ketu":    "Ketu transiting {house_label} — detachment and spiritual insight deepen in this life area.",
+}
+
+_HOUSE_ORDINALS = {
+    1: "1st house", 2: "2nd house", 3: "3rd house", 4: "4th house",
+    5: "5th house", 6: "6th house", 7: "7th house", 8: "8th house",
+    9: "9th house", 10: "10th house", 11: "11th house", 12: "12th house",
+}
+
+
+def _angular_diff(a: float, b: float) -> float:
+    """Shortest angular distance between two ecliptic longitudes (0–180°)."""
+    d = abs(a - b) % 360
+    return d if d <= 180 else 360 - d
+
+
+def _aspect_check(transit_deg: float, natal_deg: float) -> tuple[float, float, str] | None:
+    """Return (orb_used, multiplier, aspect_label) if any aspect applies, else None."""
+    for angle, max_orb, mult, label in _ASPECTS:
+        diff = _angular_diff(transit_deg, (natal_deg + angle) % 360)
+        if diff <= max_orb:
+            return diff, mult, label
+    return None
+
+
+def _intensity_label(score: float) -> str:
+    if score >= 7.5:
+        return "high"
+    if score >= 5.0:
+        return "medium"
+    return "low"
+
+
+def get_current_transits(natal_positions: dict[str, Any]) -> list[dict[str, Any]]:
+    """
+    Compute personalised transit impacts for today against a natal chart.
+
+    natal_positions: output of compute_kundli_facts()["planet_positions"]
+                     Each entry has keys: degree, sign, house.
+    Returns a list of impact dicts sorted by intensity (descending), capped at 10.
+    """
+    from datetime import timezone as _tz
+
+    now_utc = datetime.now(_tz.utc)
+
+    # ── Get today's planet positions ──────────────────────────────────────────
+    try:
+        today_ctx = BirthContext(
+            local_dt=now_utc,
+            utc_dt=now_utc,
+            latitude=0.0,   # latitude irrelevant for planet longitudes
+            longitude=0.0,
+        )
+        transit_planets, _lagna, _engine = _compute_planetary_longitudes(today_ctx, "Lahiri")
+    except Exception:
+        # Pure-Python fallback using the approximate helpers
+        transit_planets = {
+            "Sun":  _approx_solar_longitude(now_utc),
+            "Moon": _approx_lunar_longitude(now_utc),
+        }
+        # Fill remaining planets with seed-based fallback using today's date
+        seed = int(now_utc.strftime("%Y%m%d%H"))
+        for name, mult in [("Mercury", 17), ("Venus", 19), ("Mars", 23),
+                            ("Jupiter", 29), ("Saturn", 31), ("Rahu", 37)]:
+            transit_planets[name] = float((seed * mult) % 36000) / 100
+        transit_planets["Ketu"] = (transit_planets["Rahu"] + 180) % 360
+
+    # ── Build natal lookup: name → degree ─────────────────────────────────────
+    natal_degrees: dict[str, float] = {}
+    natal_houses: dict[str, int] = {}
+    for planet_name, info in natal_positions.items():
+        natal_degrees[planet_name] = float(info["degree"])
+        natal_houses[planet_name] = int(info["house"])
+
+    # ── Find natal lagna degree (reconstruct from first planet whose house == 1) ─
+    # We store lagna as a synthetic entry if present
+    natal_lagna_deg: float | None = natal_positions.get("Lagna", {}).get("degree")  # type: ignore[assignment]
+
+    impacts: list[dict[str, Any]] = []
+
+    for t_planet, t_deg in transit_planets.items():
+        t_sign = _zodiac_sign_from_degree(t_deg)
+
+        # Check against each natal planet
+        for n_planet, n_deg in natal_degrees.items():
+            pair = (t_planet, n_planet)
+            asp = _aspect_check(t_deg, n_deg)
+            if asp is None:
+                continue
+            orb, mult, aspect_label = asp
+
+            base_info = _TRANSIT_BASE_INTENSITY.get(pair)
+            if base_info:
+                raw_score, title, description = base_info
+            else:
+                raw_score = 4
+                house_lbl = _HOUSE_ORDINALS.get(natal_houses.get(n_planet, 1), "natal house")
+                title = f"{t_planet} aspects natal {n_planet}"
+                tmpl = _HOUSE_TRANSIT_MSGS.get(t_planet, "{planet} transiting {house_label}.")
+                description = tmpl.format(planet=t_planet, house_label=house_lbl)
+
+            final_score = raw_score * mult
+            # Proximity bonus: closer orb → stronger impact
+            orb_factor = max_orb = next(
+                (o for a, o, _, l in _ASPECTS if l == aspect_label), 5.0
+            )
+            proximity = 1.0 - (orb / orb_factor) * 0.3  # up to 30% bonus for exact
+            final_score *= proximity
+
+            natal_house = natal_houses.get(n_planet, 0)
+            impacts.append({
+                "transiting_planet": t_planet,
+                "natal_planet": n_planet,
+                "transit_sign": t_sign,
+                "transit_degree": round(t_deg, 2),
+                "natal_house": natal_house,
+                "aspect_type": aspect_label,
+                "orb_degrees": round(orb, 2),
+                "intensity": _intensity_label(final_score),
+                "intensity_score": round(final_score, 2),
+                "title": title,
+                "description": description,
+            })
+
+        # Also check against natal Lagna if available
+        if natal_lagna_deg is not None:
+            asp = _aspect_check(t_deg, natal_lagna_deg)
+            if asp:
+                orb, mult, aspect_label = asp
+                pair_lagna = (t_planet, "Lagna")
+                base_info = _TRANSIT_BASE_INTENSITY.get(pair_lagna)
+                if base_info:
+                    raw_score, title, description = base_info
+                else:
+                    raw_score = 5
+                    title = f"{t_planet} {aspect_label} Ascendant"
+                    tmpl = _HOUSE_TRANSIT_MSGS.get(t_planet, "{planet} transiting {house_label}.")
+                    description = tmpl.format(planet=t_planet, house_label="Ascendant / 1st house")
+                orb_factor = next((o for a, o, _, l in _ASPECTS if l == aspect_label), 5.0)
+                proximity = 1.0 - (orb / orb_factor) * 0.3
+                final_score = raw_score * mult * proximity
+                impacts.append({
+                    "transiting_planet": t_planet,
+                    "natal_planet": "Lagna",
+                    "transit_sign": t_sign,
+                    "transit_degree": round(t_deg, 2),
+                    "natal_house": 1,
+                    "aspect_type": aspect_label,
+                    "orb_degrees": round(orb, 2),
+                    "intensity": _intensity_label(final_score),
+                    "intensity_score": round(final_score, 2),
+                    "title": title,
+                    "description": description,
+                })
+
+    # Sort by intensity_score descending, deduplicate by (t_planet, n_planet) keeping highest
+    seen: set[tuple[str, str]] = set()
+    unique: list[dict[str, Any]] = []
+    for imp in sorted(impacts, key=lambda x: x["intensity_score"], reverse=True):
+        key = (imp["transiting_planet"], imp["natal_planet"])
+        if key not in seen:
+            seen.add(key)
+            unique.append(imp)
+
+    return unique[:10]
+
+
 def score_matchmaking(seeker_facts: dict[str, Any], partner_facts: dict[str, Any]) -> dict[str, Any]:
     """8-Koota Guna Milan compatibility scoring (max 36 points, normalised to 100)."""
     s_moon_sign = seeker_facts["planet_positions"]["Moon"]["sign"]

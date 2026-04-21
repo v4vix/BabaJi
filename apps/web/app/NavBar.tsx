@@ -15,6 +15,7 @@ const FEATURE_LINKS = [
   { href: "/panchang",    emoji: "📅", label: "Panchang",    sub: "Daily muhurta & tithi",      tier: null },
   { href: "/consult",     emoji: "💬", label: "Consult",     sub: "Live session",               tier: "Elite" },
   { href: "/insights",    emoji: "✨", label: "Insights",    sub: "Tarot, gems & numerology",   tier: null },
+  { href: "/transits",   emoji: "🪐", label: "Transits",   sub: "Today's planetary impacts",  tier: null },
 ];
 
 const COMPANY_LINKS = [

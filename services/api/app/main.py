@@ -107,6 +107,9 @@ from .schemas import (
     AshtakavargaResponse,
     PrashnaRequest,
     PrashnaResponse,
+    TransitImpact,
+    TransitImpactRequest,
+    TransitImpactResponse,
 )
 from .jyotish import (
     DASHA_LORD_MEANINGS,
@@ -119,6 +122,7 @@ from .jyotish import (
     compute_kundli_facts,
     compute_prashna_kundli,
     compute_sade_sati,
+    get_current_transits,
     panchang_for_date,
     pick_muhurta_windows,
     score_matchmaking,
@@ -3776,4 +3780,72 @@ async def prashna_kundli(
             "This reading does not constitute medical, legal, or financial advice.",
             "For important decisions, consult a qualified Jyotishi.",
         ],
+    )
+
+
+# ─── Transit Impact ───────────────────────────────────────────────────────────
+
+@app.post("/v1/transits/impact", response_model=TransitImpactResponse, tags=["transits"])
+async def transit_impact(
+    request: TransitImpactRequest,
+    ctx: dict[str, Any] = Depends(entitlement_context),
+) -> TransitImpactResponse:
+    """
+    Compute personalised transit impacts for today against the given natal chart.
+
+    Returns up to 10 planetary transits sorted by intensity, each with
+    a practical, actionable description grounded in Vedic principles.
+    """
+    require_entitlement(ctx, "kundli.report")
+
+    birth = request.birth.model_dump()
+    try:
+        facts = compute_kundli_facts(birth, ayanamsha=request.ayanamsha)
+        natal_positions = facts["planet_positions"]
+        moon_sign = natal_positions.get("Moon", {}).get("sign", "")
+        raw_impacts = get_current_transits(natal_positions)
+    except Exception as exc:
+        # Fallback: return a rule-based Moon-sign note when ephemeris fails
+        from datetime import timezone as _tz
+        now_str = datetime.now(_tz.utc).isoformat()
+        return TransitImpactResponse(
+            transits=[],
+            generated_at=now_str,
+            summary=(
+                "Ephemeris calculation encountered an issue. "
+                "Please verify birth data and retry. "
+                "As a general note: the current Moon transit activates daily emotional rhythms."
+            ),
+            disclaimer=(
+                "Transit readings are indicative only and do not constitute "
+                "medical, legal, or financial advice."
+            ),
+        )
+
+    # Build summary sentence
+    high_count = sum(1 for i in raw_impacts if i["intensity"] == "high")
+    planets_active = list({i["transiting_planet"] for i in raw_impacts})[:4]
+    if high_count:
+        summary = (
+            f"{high_count} high-intensity transit{'s' if high_count > 1 else ''} active today "
+            f"involving {', '.join(planets_active)}. "
+            "Focus on the top impacts for the most significant influences."
+        )
+    elif raw_impacts:
+        summary = (
+            f"{len(raw_impacts)} active transit{'s' if len(raw_impacts) > 1 else ''} detected today. "
+            "Overall energy is moderate — good for steady, purposeful action."
+        )
+    else:
+        summary = "No major transit aspects within orb today. A relatively quiet astrological period."
+
+    return TransitImpactResponse(
+        transits=[TransitImpact(**i) for i in raw_impacts],
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        summary=summary,
+        disclaimer=(
+            "Transit readings reflect classical Vedic principles and are indicative only. "
+            "They do not constitute medical, legal, or financial advice. "
+            "For significant life decisions, consult a qualified Jyotishi."
+        ),
     )
