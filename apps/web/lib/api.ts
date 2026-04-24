@@ -76,8 +76,20 @@ async function buildHeaders(options?: RequestOptions): Promise<Record<string, st
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const data = await response.text();
-    throw new ApiError(data || `${response.status} ${response.statusText}`, response.status);
+    const text = await response.text();
+    // Try to extract the `detail` field from a JSON error body (FastAPI standard)
+    let message = text || `${response.status} ${response.statusText}`;
+    try {
+      const parsed = JSON.parse(text) as { detail?: string | { msg?: string }[] };
+      if (typeof parsed.detail === "string") {
+        message = parsed.detail;
+      } else if (Array.isArray(parsed.detail) && parsed.detail[0]?.msg) {
+        message = parsed.detail[0].msg;
+      }
+    } catch {
+      // Not JSON — use raw text as-is
+    }
+    throw new ApiError(message, response.status);
   }
   return response.json() as Promise<T>;
 }
