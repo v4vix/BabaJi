@@ -314,7 +314,7 @@ export default function HomePage() {
                 <h2 className="home-section-title" style={{ marginBottom: 4 }}>What does your Rashi say today?</h2>
                 <div style={{ fontSize: 13, color: "#64748b" }}>{today}</div>
               </div>
-              <Link href="/insights" className="button" style={{ fontSize: 13, padding: "8px 18px", flexShrink: 0 }}>
+              <Link href="/insights?mode=rashifal" className="button" style={{ fontSize: 13, padding: "8px 18px", flexShrink: 0 }}>
                 Full Rashifal →
               </Link>
             </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ChangeEvent, type ReactNode, type Dispatch, type SetStateAction } from "react";
+import { useState, useEffect, type ChangeEvent, type ReactNode, type Dispatch, type SetStateAction } from "react";
 import { postJson } from "../../lib/api";
 import { Surface } from "@cortex/ui";
 
@@ -184,6 +184,14 @@ export default function InsightsPage() {
   const [privacyResult, setPrivacyResult] = useState<PrivacyResult | null>(null);
   const [ritualResult, setRitualResult] = useState<RitualResult | null>(null);
   const [ayurvedaResult, setAyurvedaResult] = useState<AyurvedaResult | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get("mode");
+    if (mode && INSIGHT_MODES.some((m) => m.id === mode)) {
+      setActiveMode(mode as InsightModeId);
+    }
+  }, []);
 
   const activeModeConfig = INSIGHT_MODES.find((mode) => mode.id === activeMode) ?? INSIGHT_MODES[0];
 

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import NavBar from "./NavBar";
 import Providers from "./Providers";
+import DemoSwitcher from "./DemoSwitcher";
 
 export const metadata: Metadata = {
   title: "BabaJi — Ancient Wisdom, Modern Intelligence",
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <Providers>
           <NavBar />
           {children}
+          <DemoSwitcher />
         </Providers>
       </body>
     </html>
