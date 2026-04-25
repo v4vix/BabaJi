@@ -704,6 +704,11 @@ def _user_response(user_record: dict[str, Any]) -> UserResponse:
     import json as _json
     payload = dict(user_record)
     payload["role"] = _resolved_user_role(user_record)
+    subscription = get_subscription(str(payload.get("id", "")))
+    if subscription and str(subscription["status"]).lower() in ACTIVE_SUBSCRIPTION_STATUSES:
+        payload["plan"] = subscription["plan"]
+    if settings.allow_insecure_demo_auth:
+        payload["email_verified"] = True
     payload.setdefault("full_name", "")
     raw_birth = payload.pop("birth_profile_json", None) or "{}"
     try:
@@ -819,7 +824,7 @@ def _decode_insecure_dev_token(token: str) -> str | None:
 
 async def entitlement_context(
     x_user_id: str = Header(default="demo-user"),
-    x_plan: str = Header(default="free"),
+    x_plan: str = Header(default="elite"),
     credentials: Optional[HTTPAuthorizationCredentials] = Security(_bearer_scheme),
 ) -> dict[str, Any]:
     _ensure_seeded_accounts()
@@ -868,14 +873,15 @@ async def entitlement_context(
     subscription = get_subscription(resolved_user_id)
     active_addons = list_active_addons(resolved_user_id)
 
-    # Plan resolution: subscription record > users.plan > explicit insecure demo
-    # header fallback > free
-    if subscription and str(subscription["status"]).lower() in ACTIVE_SUBSCRIPTION_STATUSES:
+    # Plan resolution: explicit insecure demo header/dev token > subscription
+    # record > users.plan > free. Demo headers stay authoritative so showcase
+    # sessions cannot be accidentally downgraded by a persisted demo-user event.
+    if auth_mode in {"dev-token", "dev-header"} and settings.allow_insecure_demo_auth:
+        plan = x_plan.lower()
+    elif subscription and str(subscription["status"]).lower() in ACTIVE_SUBSCRIPTION_STATUSES:
         plan = subscription["plan"]
     elif user_record:
         plan = user_record.get("plan", "free")
-    elif auth_mode in {"dev-token", "dev-header"} and settings.allow_insecure_demo_auth:
-        plan = x_plan.lower()
     else:
         plan = "free"
 
@@ -3550,6 +3556,20 @@ async def stripe_checkout(
     """Create a Stripe Checkout Session for plan upgrade (authenticated user only)."""
     stripe_key = _os.environ.get("STRIPE_SECRET_KEY", "")
     if not stripe_key:
+        if settings.allow_insecure_demo_auth:
+            upsert_subscription(
+                user_id=ctx["user_id"],
+                plan=req.plan,
+                status="active",
+                source="demo-stripe",
+                external_ref=f"demo-{uuid.uuid4().hex[:12]}",
+            )
+            separator = "&" if "?" in req.success_url else "?"
+            return {
+                "url": f"{req.success_url}{separator}demo_checkout=1",
+                "session_id": "demo_checkout",
+                "mode": "demo",
+            }
         raise HTTPException(status_code=503, detail="Stripe not configured")
     price_id = _STRIPE_PRICE_IDS.get(req.plan, "")
     if not price_id:

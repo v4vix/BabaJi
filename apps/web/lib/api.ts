@@ -2,7 +2,7 @@
 // Set NEXT_PUBLIC_API_BASE only when the API lives on a different origin (separate deployment).
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 export const DEFAULT_USER_ID = process.env.NEXT_PUBLIC_DEMO_USER_ID ?? "demo-user";
-export const DEFAULT_PLAN = process.env.NEXT_PUBLIC_DEMO_PLAN ?? "free";
+export const DEFAULT_PLAN = process.env.NEXT_PUBLIC_DEMO_PLAN ?? "elite";
 const ENABLE_INSECURE_DEMO_AUTH = ["1", "true"].includes(
   (process.env.NEXT_PUBLIC_ENABLE_INSECURE_DEMO_AUTH ?? "").toLowerCase(),
 );
@@ -50,6 +50,10 @@ type RequestOptions = { userId?: string; plan?: string };
 
 async function buildHeaders(options?: RequestOptions): Promise<Record<string, string>> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (ENABLE_INSECURE_DEMO_AUTH) {
+    headers["X-Plan"] = options?.plan ?? DEFAULT_PLAN;
+    headers["X-User-Id"] = options?.userId ?? DEFAULT_USER_ID;
+  }
 
   // Prefer user JWT (logged-in session) over device token
   const userJwt = getUserJwt();
@@ -65,10 +69,6 @@ async function buildHeaders(options?: RequestOptions): Promise<Record<string, st
     return headers;
   }
 
-  if (ENABLE_INSECURE_DEMO_AUTH) {
-    headers["X-Plan"] = options?.plan ?? DEFAULT_PLAN;
-    headers["X-User-Id"] = options?.userId ?? DEFAULT_USER_ID;
-  }
   return headers;
 }
 

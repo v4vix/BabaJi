@@ -20,6 +20,7 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [verificationBypassed, setVerificationBypassed] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -30,8 +31,14 @@ export default function RegisterPage() {
     try {
       const result = await apiRegister(email, password, displayName);
       saveAuth(result);
+      setVerificationBypassed(Boolean(result.user.email_verified));
       setDone(true);
-      setTimeout(() => router.push("/"), 3500);
+      setTimeout(() => {
+        const params = new URLSearchParams(window.location.search);
+        const redirect = params.get("redirect") ?? "/";
+        const plan = params.get("plan");
+        router.push(plan && redirect === "/pricing" ? `/pricing?plan=${encodeURIComponent(plan)}` : redirect);
+      }, 1200);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -54,7 +61,9 @@ export default function RegisterPage() {
               <div className="auth-success-icon">✓</div>
               <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>You&apos;re in!</h2>
               <p style={{ fontSize: 14, color: "#64748b", margin: "0 0 4px" }}>
-                We&apos;ve sent a verification email to <strong>{email}</strong>.
+                {verificationBypassed
+                  ? "Demo verification is bypassed for this account."
+                  : <>We&apos;ve sent a verification email to <strong>{email}</strong>.</>}
               </p>
               <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>Redirecting you now…</p>
             </div>

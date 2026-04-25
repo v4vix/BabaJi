@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Surface } from "@cortex/ui";
 import { postJson } from "../../lib/api";
-import { getStoredUser } from "../../lib/auth";
+import { getStoredUser, syncStoredUser } from "../../lib/auth";
 import { useToast } from "../../lib/toast";
 
 const PLANS = [
@@ -142,7 +142,12 @@ export default function PricingPage() {
   const [annual, setAnnual] = useState(false);
 
   useEffect(() => {
-    setUser(getStoredUser());
+    const storedUser = getStoredUser();
+    setUser(storedUser);
+    const pendingPlan = new URLSearchParams(window.location.search).get("plan");
+    if (storedUser && pendingPlan && pendingPlan !== storedUser.plan) {
+      setTimeout(() => void handleUpgrade(pendingPlan), 0);
+    }
   }, []);
 
   async function handleUpgrade(planId: string) {
@@ -161,9 +166,10 @@ export default function PricingPage() {
         success_url: `${window.location.origin}/billing/success?plan=${planId}`,
         cancel_url: `${window.location.origin}/pricing`,
       });
+      await syncStoredUser().catch(() => null);
       window.location.href = res.url;
-    } catch {
-      toast("Could not open checkout. Please try again or contact support.", "error");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Could not open checkout. Please try again or contact support.", "error");
     } finally {
       setLoading(null);
     }

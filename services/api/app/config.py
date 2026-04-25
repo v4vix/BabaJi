@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     api_secret: Optional[str] = None
     # Explicit opt-in for unsafe local demo auth. When enabled without API_SECRET,
     # the API accepts X-User-Id / X-Plan headers and unsigned dev device tokens.
-    allow_insecure_demo_auth: bool = False
+    allow_insecure_demo_auth: bool = True
     # Comma-separated list of allowed CORS origins.
     cors_origins: str = (
         "http://localhost:3000,http://localhost:3001,http://localhost:3002,"

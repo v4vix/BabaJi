@@ -29,6 +29,21 @@ const initialMuhurta: MuhurtaForm = {
   timezone: "Asia/Kolkata", constraints: "weekend preferred, family availability",
 };
 
+const TIMEZONES = [
+  "Asia/Kolkata",
+  "America/Phoenix",
+  "America/Los_Angeles",
+  "America/Denver",
+  "America/Chicago",
+  "America/New_York",
+  "Europe/London",
+  "Europe/Berlin",
+  "Asia/Dubai",
+  "Asia/Singapore",
+  "Australia/Sydney",
+  "UTC",
+];
+
 export default function PanchangPage() {
   const [panchangForm, setPanchangForm] = useState<PanchangForm>(initialPanchang);
   const [muhurtaForm, setMuhurtaForm] = useState<MuhurtaForm>(initialMuhurta);
@@ -37,11 +52,11 @@ export default function PanchangPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  function updatePanchang(field: keyof PanchangForm, e: ChangeEvent<HTMLInputElement>) {
+  function updatePanchang(field: keyof PanchangForm, e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setPanchangForm((prev) => ({ ...prev, [field]: e.target.value }));
   }
 
-  function updateMuhurta(field: keyof MuhurtaForm, e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+  function updateMuhurta(field: keyof MuhurtaForm, e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     setMuhurtaForm((prev) => ({ ...prev, [field]: e.target.value }));
   }
 
@@ -85,7 +100,11 @@ export default function PanchangPage() {
             <div className="form-grid">
               <Field label="Profile ID" input={<input className="input" value={panchangForm.profile_id} onChange={(e) => updatePanchang("profile_id", e)} />} />
               <Field label="Date" input={<input className="input" type="date" value={panchangForm.date} onChange={(e) => updatePanchang("date", e)} />} />
-              <Field label="Timezone" input={<input className="input" value={panchangForm.timezone} onChange={(e) => updatePanchang("timezone", e)} />} />
+              <Field label="Timezone" input={
+                <select className="select" value={panchangForm.timezone} onChange={(e) => updatePanchang("timezone", e)}>
+                  {TIMEZONES.map((timezone) => <option key={timezone} value={timezone}>{timezone}</option>)}
+                </select>
+              } />
               <Field label="Location" input={<input className="input" value={panchangForm.location} onChange={(e) => updatePanchang("location", e)} />} />
             </div>
             <button className="button" type="button" data-testid="panchang-submit" onClick={runPanchang} disabled={loading}>
@@ -101,7 +120,11 @@ export default function PanchangPage() {
               <Field label="Intent" input={<input className="input" value={muhurtaForm.intent} onChange={(e) => updateMuhurta("intent", e)} />} />
               <Field label="Date From" input={<input className="input" type="date" value={muhurtaForm.date_from} onChange={(e) => updateMuhurta("date_from", e)} />} />
               <Field label="Date To" input={<input className="input" type="date" value={muhurtaForm.date_to} onChange={(e) => updateMuhurta("date_to", e)} />} />
-              <Field label="Timezone" input={<input className="input" value={muhurtaForm.timezone} onChange={(e) => updateMuhurta("timezone", e)} />} />
+              <Field label="Timezone" input={
+                <select className="select" value={muhurtaForm.timezone} onChange={(e) => updateMuhurta("timezone", e)}>
+                  {TIMEZONES.map((timezone) => <option key={timezone} value={timezone}>{timezone}</option>)}
+                </select>
+              } />
             </div>
             <Field
               label="Constraints"

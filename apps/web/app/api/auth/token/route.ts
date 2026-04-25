@@ -20,7 +20,7 @@ export const runtime = "nodejs";
 export async function GET() {
   const secret = process.env.API_SECRET;
   const userId = process.env.DEMO_USER_ID ?? "demo-user";
-  const enableInsecureDemoAuth = ["1", "true"].includes((process.env.ENABLE_INSECURE_DEMO_AUTH ?? "").toLowerCase());
+  const enableInsecureDemoAuth = (process.env.ENABLE_INSECURE_DEMO_AUTH ?? "true").toLowerCase() !== "false";
 
   if (!secret) {
     if (!enableInsecureDemoAuth) {

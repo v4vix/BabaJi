@@ -74,24 +74,6 @@ const FEATURES = [
   { icon: "🔒", title: "Private by design", body: "Your birth data stays local unless you opt in. Full GDPR-compliant deletion on request." },
 ];
 
-const RITUAL_STEPS = [
-  {
-    step: "01",
-    title: "Choose one doorway",
-    body: "Start with the path that matches your moment: Kundli for self-understanding, Vaastu for home energy, Panchang for timing, or Insights for lighter reflection.",
-  },
-  {
-    step: "02",
-    title: "Receive grounded clarity",
-    body: "Each answer is designed to feel calm, readable, and specific enough to act on without overwhelming you.",
-  },
-  {
-    step: "03",
-    title: "Keep what matters",
-    body: "Save the readings worth returning to and let one question become a longer personal practice over time.",
-  },
-];
-
 const TRUST_SIGNALS = ["Private by default", "Classical grounding", "Readable next steps"];
 
 const STARTER_PATHS = [
@@ -211,6 +193,7 @@ export default function HomePage() {
   const [selectedPathId, setSelectedPathId] = useState(STARTER_PATHS[0].id);
   const [selectedRashi, setSelectedRashi] = useState(RASHIS[0]);
   const [rashiPreview, setRashiPreview] = useState(getDailyPreview(RASHIS[0].id));
+  const [showFullRashifal, setShowFullRashifal] = useState(false);
   const [testimonialIdx, setTestimonialIdx] = useState(0);
   const selectedPath = STARTER_PATHS.find((path) => path.id === selectedPathId) ?? STARTER_PATHS[0];
 
@@ -265,25 +248,38 @@ export default function HomePage() {
           </div>
 
           <aside className="home-ritual-card">
-            <div className="home-ritual-kicker">A better first-run experience</div>
-            <h2 className="home-ritual-title">From uncertainty to a useful next step.</h2>
+            <div className="home-ritual-kicker">Choose your starting point</div>
+            <h2 className="home-ritual-title">{selectedPath.title}</h2>
             <p className="home-ritual-copy">
-              The best version of this product feels more like a trusted ritual than a feature grid.
-              These are the three beats the experience is optimized around.
+              {selectedPath.body}
             </p>
             <div className="home-step-list">
-              {RITUAL_STEPS.map((item) => (
-                <div key={item.step} className="home-step-card">
-                  <div className="home-step-number">{item.step}</div>
+              {STARTER_PATHS.map((path, index) => {
+                const active = path.id === selectedPathId;
+                return (
+                <button
+                  key={path.id}
+                  type="button"
+                  className="home-step-card"
+                  onClick={() => setSelectedPathId(path.id)}
+                  style={{
+                    textAlign: "left",
+                    borderColor: active ? `${path.accent}66` : undefined,
+                    background: active ? `${path.accent}12` : undefined,
+                  }}
+                >
+                  <div className="home-step-number" style={{ color: path.accent }}>{String(index + 1).padStart(2, "0")}</div>
                   <div>
-                    <div className="home-step-title">{item.title}</div>
-                    <div className="home-step-body">{item.body}</div>
+                    <div className="home-step-title">{path.label}</div>
+                    <div className="home-step-body">{path.tag}</div>
                   </div>
-                </div>
-              ))}
+                </button>
+              );})}
             </div>
             <div className="home-ritual-footer">
-              Your first reading is free. Save the ones you want to return to.
+              <Link href={selectedPath.href} className="button" style={{ width: "100%", justifyContent: "center" }}>
+                {selectedPath.cta}
+              </Link>
             </div>
           </aside>
         </div>
@@ -314,9 +310,14 @@ export default function HomePage() {
                 <h2 className="home-section-title" style={{ marginBottom: 4 }}>What does your Rashi say today?</h2>
                 <div style={{ fontSize: 13, color: "#64748b" }}>{today}</div>
               </div>
-              <Link href="/insights?mode=rashifal" className="button" style={{ fontSize: 13, padding: "8px 18px", flexShrink: 0 }}>
-                Full Rashifal →
-              </Link>
+              <button
+                type="button"
+                className="button"
+                style={{ fontSize: 13, padding: "8px 18px", flexShrink: 0 }}
+                onClick={() => setShowFullRashifal((open) => !open)}
+              >
+                {showFullRashifal ? "Hide Full Rashifal" : "Full Rashifal"}
+              </button>
             </div>
 
             {/* Rashi selector */}
@@ -358,6 +359,19 @@ export default function HomePage() {
                   <span style={{ fontWeight: 600, color: "#ef4444", fontSize: 13 }}>{rashiPreview.caution}</span>
                 </div>
               </div>
+              {showFullRashifal ? (
+                <div className="rashifal-full-panel">
+                  <div className="result-section-label">Today&apos;s guidance</div>
+                  <p>
+                    {selectedRashi.name} carries a {rashiPreview.theme.toLowerCase()} tone today. {rashiPreview.energy}{" "}
+                    Treat the day as a chance to move one useful thing forward while keeping the caution in view.
+                  </p>
+                  <div className="badge-row">
+                    <span className="badge ok">Best focus: {rashiPreview.theme}</span>
+                    <span className="badge muted">Supportive color: {rashiPreview.lucky_color}</span>
+                  </div>
+                </div>
+              ) : null}
               <p style={{ fontSize: 12, color: "#94a3b8", margin: "12px 0 0", fontStyle: "italic" }}>
                 Personalized rashifal with planetary positions requires a{" "}
                 <Link href="/register" style={{ color: "#0a9396" }}>free account</Link>.

@@ -62,6 +62,23 @@ export default function LoginPage() {
     }
   }
 
+  async function loginDemoAccount(account: DemoAccount) {
+    setEmail(account.email);
+    setPassword(account.password);
+    setError("");
+    setLoading(true);
+    try {
+      const result = await apiLogin(account.email, account.password);
+      saveAuth(result);
+      toast(`Signed in as ${account.display_name}.`);
+      router.push("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="auth-page">
       <div className="auth-card">
@@ -119,13 +136,11 @@ export default function LoginPage() {
                     type="button"
                     className="button secondary"
                     style={{ justifyContent: "space-between", textAlign: "left", width: "100%" }}
-                    onClick={() => {
-                      setEmail(account.email);
-                      setPassword(account.password);
-                    }}
+                    onClick={() => void loginDemoAccount(account)}
+                    disabled={loading}
                   >
                     <span>{account.display_name} · {account.plan} · {account.role}</span>
-                    <span style={{ color: "#64748b" }}>Use this account</span>
+                    <span style={{ color: "#64748b" }}>Sign in</span>
                   </button>
                 ))}
               </div>

@@ -36,6 +36,21 @@ const initialPrivacy: PrivacyForm = { user_id: "demo-user", scope: "consults", r
 const initialRitual: RitualForm = { query: "Suggest a safe satvik evening routine for focus." };
 const initialAyurveda: AyurvedaForm = { query: "Share educational lifestyle suggestions for stable daily energy." };
 
+const ZODIAC_SIGNS = [
+  "Aries",
+  "Taurus",
+  "Gemini",
+  "Cancer",
+  "Leo",
+  "Virgo",
+  "Libra",
+  "Scorpio",
+  "Sagittarius",
+  "Capricorn",
+  "Aquarius",
+  "Pisces",
+];
+
 const INSIGHT_MODES: Array<{
   id: InsightModeId;
   title: string;
@@ -194,6 +209,11 @@ export default function InsightsPage() {
   }, []);
 
   const activeModeConfig = INSIGHT_MODES.find((mode) => mode.id === activeMode) ?? INSIGHT_MODES[0];
+
+  function selectMode(mode: InsightModeId) {
+    setActiveMode(mode);
+    setError("");
+  }
 
   async function onTarot() {
     if (!tarotForm.profile_id || !tarotForm.intention) { setError("Tarot profile and intention are required."); return; }
@@ -398,7 +418,11 @@ export default function InsightsPage() {
         return (
           <>
             <Field label="Profile ID" input={<input className="input" value={rashifalForm.profile_id} onChange={update(setRashifalForm, "profile_id")} />} />
-            <Field label="Sign" input={<input className="input" value={rashifalForm.sign} onChange={update(setRashifalForm, "sign")} />} />
+            <Field label="Sign" input={
+              <select className="select" value={rashifalForm.sign} onChange={update(setRashifalForm, "sign")}>
+                {ZODIAC_SIGNS.map((sign) => <option key={sign} value={sign}>{sign}</option>)}
+              </select>
+            } />
             <Field label="Horizon" input={
               <select className="select" value={rashifalForm.horizon} onChange={update(setRashifalForm, "horizon")}>
                 <option value="daily">Daily</option>
@@ -482,7 +506,7 @@ export default function InsightsPage() {
                     key={mode.id}
                     type="button"
                     className={`feature-path-card${active ? " active" : ""}`}
-                    onClick={() => setActiveMode(mode.id)}
+                    onClick={() => selectMode(mode.id)}
                     style={
                       active
                         ? {
@@ -562,7 +586,7 @@ export default function InsightsPage() {
 
       {/* ── Results ──────────────────────────────────────────────────────── */}
 
-      {tarotResult ? (
+      {activeMode === "tarot" && tarotResult ? (
         <InsightTile title="Tarot Reading" subtitle={`${tarotResult.spread} · ${tarotForm.intention}`} testId="tarot-result">
           <Section label="Cards">
             <div style={{ display: "grid", gap: 10 }}>
@@ -584,7 +608,7 @@ export default function InsightsPage() {
         </InsightTile>
       ) : null}
 
-      {numerologyResult ? (
+      {activeMode === "numerology" && numerologyResult ? (
         <InsightTile title="Numerology Report" subtitle={numerologyForm.full_name} testId="numerology-result">
           <div className="badge-row">
             <span className="badge ok" style={{ fontSize: "1rem", padding: "8px 16px" }}>Life Path {numerologyResult.life_path_number}</span>
@@ -597,7 +621,7 @@ export default function InsightsPage() {
         </InsightTile>
       ) : null}
 
-      {mantraResult ? (
+      {activeMode === "mantra" && mantraResult ? (
         <InsightTile title="Mantra Practice Plan" subtitle={`Focus: ${mantraForm.focus_area}`} testId="mantra-result">
           <div style={{ background: "#004d5d", color: "#fff", borderRadius: 12, padding: "14px 18px", fontFamily: "serif", fontSize: "1.15rem", textAlign: "center", letterSpacing: "0.03em" }}>
             {mantraResult.suggested_mantra}
@@ -617,7 +641,7 @@ export default function InsightsPage() {
         </InsightTile>
       ) : null}
 
-      {rashifalResult ? (
+      {activeMode === "rashifal" && rashifalResult ? (
         <InsightTile title={`${rashifalResult.sign} — ${rashifalResult.horizon.charAt(0).toUpperCase() + rashifalResult.horizon.slice(1)} Rashifal`} testId="rashifal-result">
           <Section label="Insight">
             <div className="result-section-text large">{rashifalResult.insight}</div>
@@ -633,7 +657,7 @@ export default function InsightsPage() {
         </InsightTile>
       ) : null}
 
-      {gemResult ? (
+      {activeMode === "gem" && gemResult ? (
         <InsightTile title={`Gem Guidance — ${gemForm.primary_planet}`} subtitle={`Budget: ${gemForm.budget_band}`} testId="gem-result">
           <Section label="Recommendation">
             <div className="result-section-text">{gemResult.recommendation}</div>
@@ -656,7 +680,7 @@ export default function InsightsPage() {
         </InsightTile>
       ) : null}
 
-      {ritualResult ? (
+      {activeMode === "ritual" && ritualResult ? (
         <InsightTile title="Ritual Guide" testId="ritual-result">
           <Section label="Guidance">
             <div className="result-section-text">{ritualResult.guidance}</div>
@@ -665,7 +689,7 @@ export default function InsightsPage() {
         </InsightTile>
       ) : null}
 
-      {ayurvedaResult ? (
+      {activeMode === "ayurveda" && ayurvedaResult ? (
         <InsightTile title="Ayurveda Guide" testId="ayurveda-result">
           <Section label="Guidance">
             <div className="result-section-text">{ayurvedaResult.guidance}</div>

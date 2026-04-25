@@ -721,3 +721,51 @@ def test_free_plan_feature_gating() -> None:
         json={"query": "Suggest a safe morning routine."},
     )
     assert ritual.status_code == 200
+
+
+def test_local_demo_default_auth_unlocks_showcase_without_weakening_free_plan() -> None:
+    """Unauthenticated local demo requests use the default demo plan, while explicit free remains gated."""
+    demo = client.post(
+        "/v1/mantra/plan",
+        json={"profile_id": "demo", "focus_area": "focus", "minutes_per_day": 15, "days_per_week": 5},
+    )
+    assert demo.status_code == 200
+    assert "suggested_mantra" in demo.json()
+
+    explicit_free = client.post(
+        "/v1/mantra/plan",
+        headers={"X-Plan": "free", "X-User-Id": f"free-user-{uuid4().hex[:8]}"},
+        json={"profile_id": "free", "focus_area": "focus", "minutes_per_day": 15, "days_per_week": 5},
+    )
+    assert explicit_free.status_code == 403
+
+
+def test_demo_stripe_checkout_activates_subscription_when_stripe_is_unconfigured(monkeypatch) -> None:
+    """Local demo checkout should not fail with 'Stripe not configured'."""
+    monkeypatch.delenv("STRIPE_SECRET_KEY", raising=False)
+    user_id = f"demo-checkout-{uuid4().hex[:8]}"
+
+    checkout = client.post(
+        "/v1/billing/stripe/checkout",
+        headers={"X-User-Id": user_id},
+        json={
+            "plan": "pro",
+            "success_url": "http://localhost:3000/billing/success?plan=pro",
+            "cancel_url": "http://localhost:3000/pricing",
+        },
+    )
+    assert checkout.status_code == 200
+    data = checkout.json()
+    assert data["mode"] == "demo"
+    assert data["session_id"] == "demo_checkout"
+    assert data["url"].endswith("&demo_checkout=1")
+
+    entitlements = client.get(
+        f"/v1/business/entitlements?user_id={user_id}",
+        headers={"X-User-Id": user_id},
+    )
+    assert entitlements.status_code == 200
+    resolved = entitlements.json()
+    assert resolved["plan"] == "pro"
+    assert "kundli.report" in resolved["entitlements"]
+    assert "mantra.plan" in resolved["entitlements"]

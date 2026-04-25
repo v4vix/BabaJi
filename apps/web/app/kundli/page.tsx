@@ -77,6 +77,21 @@ const SIGNS = [
   "Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces",
 ];
 
+const TIMEZONES = [
+  "Asia/Kolkata",
+  "America/Phoenix",
+  "America/Los_Angeles",
+  "America/Denver",
+  "America/Chicago",
+  "America/New_York",
+  "Europe/London",
+  "Europe/Berlin",
+  "Asia/Dubai",
+  "Asia/Singapore",
+  "Australia/Sydney",
+  "UTC",
+];
+
 const SIGN_SHORT: Record<string, string> = {
   Aries:"Ar", Taurus:"Ta", Gemini:"Ge", Cancer:"Cn", Leo:"Le", Virgo:"Vi",
   Libra:"Li", Scorpio:"Sc", Sagittarius:"Sg", Capricorn:"Cp", Aquarius:"Aq", Pisces:"Pi",
@@ -500,11 +515,11 @@ export default function KundliPage() {
     }
   }
 
-  function updateKundliField(field: keyof KundliForm, e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+  function updateKundliField(field: keyof KundliForm, e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     setKundliForm((prev) => ({ ...prev, [field]: e.target.value }));
   }
 
-  function updateRectField(field: keyof RectifyForm, e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+  function updateRectField(field: keyof RectifyForm, e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     setRectForm((prev) => ({ ...prev, [field]: e.target.value }));
   }
 
@@ -688,7 +703,11 @@ export default function KundliPage() {
                 <Field label="Profile ID" input={<input className="input" value={kundliForm.profile_id} onChange={(e) => updateKundliField("profile_id", e)} />} />
                 <Field label="Birth Date" input={<input className="input" type="date" value={kundliForm.date} onChange={(e) => updateKundliField("date", e)} />} />
                 <Field label="Birth Time" input={<input className="input" type="time" value={kundliForm.time} onChange={(e) => updateKundliField("time", e)} />} />
-                <Field label="Timezone" input={<input className="input" value={kundliForm.timezone} onChange={(e) => updateKundliField("timezone", e)} />} />
+                <Field label="Timezone" input={
+                  <select className="select" value={kundliForm.timezone} onChange={(e) => updateKundliField("timezone", e)}>
+                    {TIMEZONES.map((timezone) => <option key={timezone} value={timezone}>{timezone}</option>)}
+                  </select>
+                } />
                 <Field
                   label="Location"
                   input={
@@ -787,7 +806,11 @@ export default function KundliPage() {
               <Field label="Birth Date" input={<input className="input" type="date" value={rectForm.birth_date} onChange={(e) => updateRectField("birth_date", e)} />} />
               <Field label="Window Start" input={<input className="input" type="time" value={rectForm.time_window_start} onChange={(e) => updateRectField("time_window_start", e)} />} />
               <Field label="Window End" input={<input className="input" type="time" value={rectForm.time_window_end} onChange={(e) => updateRectField("time_window_end", e)} />} />
-              <Field label="Timezone" input={<input className="input" value={rectForm.timezone} onChange={(e) => updateRectField("timezone", e)} />} />
+              <Field label="Timezone" input={
+                <select className="select" value={rectForm.timezone} onChange={(e) => updateRectField("timezone", e)}>
+                  {TIMEZONES.map((timezone) => <option key={timezone} value={timezone}>{timezone}</option>)}
+                </select>
+              } />
               <Field label="Event Title" input={<input className="input" value={rectForm.event_title} onChange={(e) => updateRectField("event_title", e)} />} />
               <Field label="Event Date" input={<input className="input" type="date" value={rectForm.event_date} onChange={(e) => updateRectField("event_date", e)} />} />
             </div>
